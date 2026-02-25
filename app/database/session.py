@@ -1,21 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base
 
 from app.core.settings import settings
 
-db_engine = create_engine(
-    settings.connection_string,
-    pool_pre_ping=True,  # avoids stale connections
-    pool_size=10,  # allow concurrency scalling
-    max_overflow=20,
-)
+db_engine = create_async_engine(settings.async_connection_string, pool_pre_ping=True)
 
 
-SessionLocal = sessionmaker(
-    autocommit=False,  # ensures transaction control
-    autoflush=False,
-    bind=db_engine,
-)
+SessionLocal = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 Base = declarative_base()
