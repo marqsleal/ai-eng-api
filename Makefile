@@ -61,14 +61,14 @@ alembic_init:
 	@$(VENV_BIN)/python -m alembic init migrations
 
 
-.PHONY: alembic_migrate
-alembic_migrate:
-	@$(VENV_BIN)/python -m alembic revision --autogenerate -m "$(msg)"
-
-
 .PHONY: alembic_upgrade
 alembic_upgrade:
 	@$(VENV_BIN)/python -m alembic upgrade head
+
+
+.PHONY: alembic_migrate
+alembic_migrate:
+	@$(VENV_BIN)/python -m alembic revision --autogenerate -m "$(msg)"
 
 
 .PHONY: run_test
@@ -91,45 +91,25 @@ run_prd:
 	--port 8000 \
 	--workers 4
 
-# TODO: Set up docker-compose for db and obs
 .PHONY: db_up
 db_up:
-	@docker run -d \
-	--name postgres \
-	--restart unless-stopped \
-	-e POSTGRES_USER="${POSTGRES_USER}" \
-	-e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-	-e POSTGRES_DB="${POSTGRES_DB}" \
-	-p "${POSTGRES_PORT}:5432" \
-	-v postgres_data:/var/lib/postgresql/data \
-	--health-cmd="pg_isready -U ${POSTGRES_USER}" \
-	--health-interval=10s \
-	--health-timeout=5s \
-	--health-retries=5 \
-	postgres:16
+	@docker compose up -d postgres
 
 
 .PHONY: db_down
 db_down:
-	@docker stop postgres
-	@docker rm postgres
+	@docker compose stop postgres
 
 
 .PHONY: obs_up
 obs_up:
-	@docker run -d --name jaeger \
-		-e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
-		-p 16686:16686 \
-		-p 4317:4317 \
-		-p 4318:4318 \
-		jaegertracing/all-in-one:latest
-	@echo "Jagger UI: http://localhost:16686"
+	@docker compose up -d jaeger
+	@echo "Jaeger UI: http://localhost:16686"
 
 
 .PHONY: obs_down
 obs_down:
-	@docker stop jaeger
-	@docker rm jaeger
+	@docker compose stop jaeger
 
 
 .PHONY: clean
