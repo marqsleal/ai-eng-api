@@ -71,6 +71,11 @@ alembic_upgrade:
 	@$(VENV_BIN)/python -m alembic upgrade head
 
 
+.PHONY: run_test
+run_test:
+	@$(VENV_BIN)/python -m pytest tests
+
+
 .PHONY: run_dev
 run_dev:
 	@$(VENV_BIN)/python -m uvicorn $(API_MODULE) \

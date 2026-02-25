@@ -16,6 +16,14 @@ DBSession = Annotated[Session, Depends(get_db)]
 
 @health_router.get("/health/db")
 def db_health_deck(db: DBSession):
+    """Run a lightweight DB query to verify database connectivity.
+
+    Expected request:
+    GET /health/db
+
+    Expected output (200):
+    {"status": "ok"}
+    """
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok"}

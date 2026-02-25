@@ -2,9 +2,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.endpoints.conversations import conversations_router
 from app.api.endpoints.health import health_router
+from app.api.endpoints.model_versions import model_versions_router
+from app.api.endpoints.users import users_router
 from app.core.logging import get_logger, setup_logging
-from app.core.observability import setup_telemetry
 from app.core.settings import settings
 
 setup_logging()
@@ -30,7 +32,10 @@ async def lifespan(app: FastAPI):
 def app_factory() -> FastAPI:
     app = FastAPI(title=settings.SERVICE_NAME, debug=settings.DEBUG, lifespan=lifespan)
     app.include_router(health_router)
-    setup_telemetry(app)
+    app.include_router(users_router)
+    app.include_router(model_versions_router)
+    app.include_router(conversations_router)
+    # setup_telemetry(app)
     return app
 
 
