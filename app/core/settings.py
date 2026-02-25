@@ -1,7 +1,24 @@
+from enum import Enum
 from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LogFormat(Enum):
+    JSON = "JSON"
+    HUMAN = "HUMAN"
+
+
+class Environment(Enum):
+    DEV = "DEV"
+    HML = "HML"
+    PRD = "PRD"
+
+
+class LogLevel(Enum):
+    INFO = "INFO"
+    DEBUG = "DEBUG"
 
 
 class Settings(BaseSettings):
@@ -17,27 +34,31 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        # extra="ignore"
     )
 
     SERVICE_NAME: str = Field(default="ai-eng-api")
-    ENVIRONMENT: str = Field(default="dev")
-    LOG_LEVEL: str = Field(default="INFO")
+    ENVIRONMENT: Environment = Environment.DEV
+    LOG_LEVEL: LogLevel = LogLevel.DEBUG
+    LOG_FORMAT: LogFormat = LogFormat.HUMAN
 
     API_VI_PREFIX: str = Field(default="/api/v1")
     DEBUG: bool = Field(default=False)
 
-    DATABASE_URL: str
     REDIS_URL: str | None = None
     VECTOR_DB_URL: str | None = None
 
     VERSION: str = Field(default="1.0.0")
     OTEL_EXPORTER_OTLP_ENDPOINT: str
 
+    POSTGRES_HOSTNAME: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     POSTGRES_PORT: int = Field(5432)
+
+    @property
+    def connection_string(self) -> str:
+        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOSTNAME}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 
 @lru_cache

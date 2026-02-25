@@ -3,8 +3,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.core.settings import settings
 
+# TODO: refatorar engine para um nome menos genérico
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.connection_string,
     pool_pre_ping=True,  # avoids stale connections
     pool_size=10,  # allow concurrency scalling
     max_overflow=20,

@@ -5,11 +5,12 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from app.core.settings import settings
+from app.core.settings import LogFormat, settings
 
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        # TODO: Refactor to pydantic model
         log_record: dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "level": record.levelname,
@@ -25,7 +26,18 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             log_record["exception"] = self.formatException(record.exc_info)
 
+        # TODO: model.dumps(log_record)
         return json.dumps(log_record)
+
+
+class HumanFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        timestamp = datetime.now().isoformat()
+        logger = record.name
+        level = record.levelname
+        message = record.getMessage()
+
+        return f"{timestamp} | {logger:<50} | {level:<10} | {message}"
 
 
 def setup_logging() -> None:
@@ -54,7 +66,10 @@ def setup_logging() -> None:
         ValueError:
             If the logging configuration dictionary is invalid.
     """
-    log_level = settings.LOG_LEVEL
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
+        logger = logging.getLogger(name)
+        logger.handlers.clear()
+        logger.propagate = True
 
     logging_config = {
         "version": 1,
@@ -62,18 +77,19 @@ def setup_logging() -> None:
         "formatters": {
             "json": {
                 "()": JsonFormatter,
-            }
+            },
+            "human": {"()": HumanFormatter},
         },
         "handlers": {
             "default": {
                 "class": "logging.StreamHandler",
-                "formatter": "json",
+                "formatter": "json" if settings.LOG_FORMAT == LogFormat.JSON else "human",
                 "stream": sys.stdout,
             }
         },
         "root": {
             "handlers": ["default"],
-            "level": log_level,
+            "level": settings.LOG_LEVEL,
         },
     }
 
