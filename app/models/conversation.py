@@ -14,7 +14,7 @@ class Conversation(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
-    model_version_id = Column(UUID(as_uuid=True), ForeignKey("model_versions.id"), nullable=False)
+    model_version_id = Column(UUID(as_uuid=True), ForeignKey("model_version.id"), nullable=False)
 
     prompt = Column(Text, nullable=False)
     response = Column(Text, nullable=False)

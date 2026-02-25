@@ -10,13 +10,13 @@ from app.database.session import Base
 class ModelVersion(Base):
     __tablename__ = "model_version"
 
-    id = Column()
-
-    provider = Column(
+    id = Column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )
+
+    provider = Column(String, nullable=False)
 
     model_name = Column(String, nullable=False)
 
