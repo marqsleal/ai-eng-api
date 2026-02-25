@@ -78,10 +78,10 @@ def setup_logging() -> None:
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            LogFormat.JSON.name: {
+            "JSON": {
                 "()": JsonFormatter,
             },
-            LogFormat.HUMAN.name: {"()": HumanFormatter},
+            "HUMAN": {"()": HumanFormatter},
         },
         "handlers": {
             "default": {

@@ -18,3 +18,4 @@ class ModelVersionRead(BaseModel):
     model_name: str
     version_tag: str
     created_at: datetime | None = None
+    is_active: bool

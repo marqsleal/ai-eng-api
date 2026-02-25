@@ -44,7 +44,7 @@ def list_users(db: DBSession):
     Expected output (200):
     [{"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}]
     """
-    return db.query(User).order_by(User.created_at.desc()).all()
+    return db.query(User).filter(User.is_active.is_(True)).order_by(User.created_at.desc()).all()
 
 
 @users_router.get("/{user_id}", response_model=UserRead)
@@ -57,7 +57,7 @@ def get_user(user_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}
     """
-    user = db.get(User, user_id)
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user

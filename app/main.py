@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 # TODO: integrate mypi with strict mode
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Service")

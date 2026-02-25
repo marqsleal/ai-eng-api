@@ -34,3 +34,4 @@ class ConversationRead(BaseModel):
     total_tokens: int | None = None
     latency_ms: int | None = None
     created_at: datetime | None = None
+    is_active: bool

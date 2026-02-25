@@ -14,3 +14,4 @@ class UserRead(BaseModel):
     id: UUID
     email: str
     created_at: datetime | None = None
+    is_active: bool

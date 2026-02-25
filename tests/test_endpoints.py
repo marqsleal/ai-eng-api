@@ -31,13 +31,19 @@ class FakeQuery:
     def order_by(self, *_args, **_kwargs):
         return self
 
-    def filter(self, condition):
-        target_user_id = getattr(getattr(condition, "right", None), "value", None)
-        if target_user_id is not None:
-            self._data = [
-                item for item in self._data if getattr(item, "user_id", None) == target_user_id
-            ]
+    def filter(self, *conditions):
+        for condition in conditions:
+            target_value = getattr(getattr(condition, "right", None), "value", None)
+            left = getattr(condition, "left", None)
+            column_name = getattr(left, "name", None)
+            if target_value is not None and column_name:
+                self._data = [
+                    item for item in self._data if getattr(item, column_name, None) == target_value
+                ]
         return self
+
+    def first(self):
+        return self._data[0] if self._data else None
 
     def all(self):
         return list(self._data)
@@ -63,18 +69,24 @@ class FakeDB:
                     obj.id = uuid4()
                 if getattr(obj, "created_at", None) is None:
                     obj.created_at = now
+                if getattr(obj, "is_active", None) is None:
+                    obj.is_active = True
                 self.users.append(obj)
             elif isinstance(obj, ModelVersion):
                 if getattr(obj, "id", None) is None:
                     obj.id = uuid4()
                 if getattr(obj, "created_at", None) is None:
                     obj.created_at = now
+                if getattr(obj, "is_active", None) is None:
+                    obj.is_active = True
                 self.model_versions.append(obj)
             elif isinstance(obj, Conversation):
                 if getattr(obj, "id", None) is None:
                     obj.id = uuid4()
                 if getattr(obj, "created_at", None) is None:
                     obj.created_at = now
+                if getattr(obj, "is_active", None) is None:
+                    obj.is_active = True
                 self.conversations.append(obj)
         self._pending.clear()
 

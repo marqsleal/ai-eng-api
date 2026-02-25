@@ -30,9 +30,15 @@ def create_conversation(payload: ConversationCreate, db: DBSession):
     Expected output (201):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    if db.get(User, payload.user_id) is None:
+    user = db.query(User).filter(User.id == payload.user_id, User.is_active.is_(True)).first()
+    if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if db.get(ModelVersion, payload.model_version_id) is None:
+    model_version = (
+        db.query(ModelVersion)
+        .filter(ModelVersion.id == payload.model_version_id, ModelVersion.is_active.is_(True))
+        .first()
+    )
+    if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
     conversation = Conversation(**payload.model_dump())
@@ -53,7 +59,11 @@ def list_conversations(db: DBSession, user_id: UUID | None = None):
     Expected output (200):
     [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}]
     """
-    query = db.query(Conversation).order_by(Conversation.created_at.desc())
+    query = (
+        db.query(Conversation)
+        .filter(Conversation.is_active.is_(True))
+        .order_by(Conversation.created_at.desc())
+    )
     if user_id is not None:
         query = query.filter(Conversation.user_id == user_id)
     return query.all()
@@ -69,7 +79,11 @@ def get_conversation(conversation_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    conversation = db.get(Conversation, conversation_id)
+    conversation = (
+        db.query(Conversation)
+        .filter(Conversation.id == conversation_id, Conversation.is_active.is_(True))
+        .first()
+    )
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation

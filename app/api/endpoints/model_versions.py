@@ -53,7 +53,12 @@ def list_model_versions(db: DBSession):
     Expected output (200):
     [{"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "v1"}]
     """
-    return db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
+    return (
+        db.query(ModelVersion)
+        .filter(ModelVersion.is_active.is_(True))
+        .order_by(ModelVersion.created_at.desc())
+        .all()
+    )
 
 
 @model_versions_router.get("/{model_version_id}", response_model=ModelVersionRead)
@@ -66,7 +71,11 @@ def get_model_version(model_version_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "v1"}
     """
-    model_version = db.get(ModelVersion, model_version_id)
+    model_version = (
+        db.query(ModelVersion)
+        .filter(ModelVersion.id == model_version_id, ModelVersion.is_active.is_(True))
+        .first()
+    )
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     return model_version
