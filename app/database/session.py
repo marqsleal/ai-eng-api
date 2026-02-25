@@ -3,8 +3,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.core.settings import settings
 
-# TODO: refatorar engine para um nome menos genérico
-engine = create_engine(
+db_engine = create_engine(
     settings.connection_string,
     pool_pre_ping=True,  # avoids stale connections
     pool_size=10,  # allow concurrency scalling
@@ -15,7 +14,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(
     autocommit=False,  # ensures transaction control
     autoflush=False,
-    bind=engine,
+    bind=db_engine,
 )
 
 
