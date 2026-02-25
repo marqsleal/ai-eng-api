@@ -1,33 +1,36 @@
-import json
 import logging
 import logging.config
 import sys
 from datetime import datetime
-from typing import Any
+
+from pydantic import BaseModel
 
 from app.core.settings import LogFormat, settings
 
 
+class LogRecordJsonFormatter(BaseModel):
+    level: str
+    logger: str
+    message: str
+    service: str
+    environment: str
+
+    @property
+    def timestamp(self):
+        return datetime.now().isoformat()
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        # TODO: Refactor to pydantic model
-        log_record: dict[str, Any] = {
-            "timestamp": datetime.now().isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "service": settings.SERVICE_NAME,
-            "environment": settings.ENVIRONMENT,
-        }
+        log_record = LogRecordJsonFormatter(
+            level=record.levelname,
+            logger=record.levelname,
+            message=record.getMessage(),
+            service=settings.SERVICE_NAME,
+            environment=settings.ENVIRONMENT.name,
+        )
 
-        if hasattr(record, "request_id"):
-            log_record["request_id"] = record.request_id
-
-        if record.exc_info:
-            log_record["exception"] = self.formatException(record.exc_info)
-
-        # TODO: model.dumps(log_record)
-        return json.dumps(log_record)
+        return log_record.model_dump_json()
 
 
 class HumanFormatter(logging.Formatter):
@@ -89,7 +92,7 @@ def setup_logging() -> None:
         },
         "root": {
             "handlers": ["default"],
-            "level": settings.LOG_LEVEL,
+            "level": settings.LOG_LEVEL.name,
         },
     }
 

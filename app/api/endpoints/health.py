@@ -9,12 +9,12 @@ from app.core.settings import settings
 from app.database.dependencies import get_db
 
 logger = get_logger(__name__)
-router = APIRouter()
+health_router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@router.get("/health/db")
+@health_router.get("/health/db")
 def db_health_deck(db: DBSession):
     try:
         db.execute(text("SELECT 1"))

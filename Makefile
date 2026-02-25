@@ -89,7 +89,7 @@ run_prd:
 	--port 8000 \
 	--workers 4
 
-
+# TODO: Set up docker-compose for db and obs
 .PHONY: db_up
 db_up:
 	@docker run -d \
