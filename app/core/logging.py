@@ -78,15 +78,15 @@ def setup_logging() -> None:
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "json": {
+            LogFormat.JSON.name: {
                 "()": JsonFormatter,
             },
-            "human": {"()": HumanFormatter},
+            LogFormat.HUMAN.name: {"()": HumanFormatter},
         },
         "handlers": {
             "default": {
                 "class": "logging.StreamHandler",
-                "formatter": "json" if settings.LOG_FORMAT == LogFormat.JSON else "human",
+                "formatter": "JSON" if settings.LOG_FORMAT == LogFormat.JSON else "HUMAN",
                 "stream": sys.stdout,
             }
         },
