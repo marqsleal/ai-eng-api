@@ -69,17 +69,20 @@ make obs_up
 make alembic_upgrade
 ```
 
-4. Run API:
+4. Bring up the API/stack:
 
 ```bash
-make run_dev
+make run_dev        # alias for api_up (Docker Compose)
+make stack_up       # optional: start api + postgres/jaeger/ollama together
 ```
+
+Use `make stack_down`/`make stack_stop` or the `*restart` targets for each service, and `make logs_stack`/`logs_api`/`logs_db` etc. for live output.
 
 API: `http://localhost:8000`
 Swagger UI: `http://localhost:8000/docs`
 OpenAPI JSON: `http://localhost:8000/openapi.json`
 
-## Local LLM (Ollama)
+## Local LLM (Ollama) & Observability
 
 - Compose service: `ollama`
 - Default model is read from `.env`:
@@ -157,6 +160,8 @@ Important LLM/database vars:
 - `OLLAMA_BASE_URL`
 - `OLLAMA_DEFAULT_MODEL`
 - `OLLAMA_TIMEOUT_SECONDS`
+- `OLLAMA_IMAGE_TAG` (default `0.17.1`; bump when a new Ollama release is verified)
+- `JAEGER_IMAGE_TAG`
 - `OLLAMA_STARTUP_CHECK_ENABLED`
 - `OPENAPI_ENABLED`, `OPENAPI_JSON_PATH`
 - `SWAGGER_UI_ENABLED`, `SWAGGER_UI_PATH`

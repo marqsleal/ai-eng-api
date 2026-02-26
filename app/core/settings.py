@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     OLLAMA_DEFAULT_MODEL: str = Field(default="llama3.2:3b")
     OLLAMA_TIMEOUT_SECONDS: float = Field(default=30.0)
     OLLAMA_STARTUP_CHECK_ENABLED: bool = Field(default=True)
+    OLLAMA_IMAGE_TAG: str = Field(default="0.17.1")
+    JAEGER_IMAGE_TAG: str = Field(default="1.49.0")
 
     VERSION: str = Field(default="1.0.0")
     OTEL_EXPORTER_OTLP_ENDPOINT: str

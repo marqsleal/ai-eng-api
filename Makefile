@@ -28,9 +28,9 @@ API_WORKERS = 4
 # COMMANDS                                                                                 #
 ############################################################################################
 
-
+## setup
 .PHONY: project_init
-project_init: 
+project_init:
 	@echo "Creating Python Virtual Environment"
 	@$(PYTHON) -m venv $(VENV_NAME)
 	@$(VENV_PYTHON) -m ensurepip --upgrade
@@ -49,18 +49,7 @@ poetry_reinstall:
 	@$(POETRY) install
 
 
-.PHONY: lint
-lint:
-	@$(VENV_PYTHON) -m ruff check $(APP_DIR) $(TEST_DIR)
-	@$(VENV_PYTHON) -m ruff format --check $(APP_DIR) $(TEST_DIR)
-
-
-.PHONY: format
-format:
-	@$(VENV_PYTHON) -m ruff check --fix $(APP_DIR) $(TEST_DIR)
-	@$(VENV_PYTHON) -m ruff format $(APP_DIR) $(TEST_DIR)
-
-
+## migrations
 .PHONY: alembic_init
 alembic_init:
 	@$(VENV_PYTHON) -m alembic init migrations
@@ -76,34 +65,68 @@ alembic_migrate:
 	@$(VENV_PYTHON) -m alembic revision --autogenerate -m "$(msg)"
 
 
-.PHONY: run_test
-run_test:
+## tests
+.PHONY: test
+test:
 	@$(VENV_PYTHON) -m pytest $(TEST_DIR)
 
 
+## lint/format
+.PHONY: lint
+lint:
+	@$(VENV_PYTHON) -m ruff check $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff format --check $(APP_DIR) $(TEST_DIR)
+
+
+.PHONY: format
+format:
+	@$(VENV_PYTHON) -m ruff check --fix $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff format $(APP_DIR) $(TEST_DIR)
+
+
+## run
 .PHONY: run_dev
-run_dev:
-	@$(VENV_PYTHON) -m uvicorn $(API_MODULE) \
-	--host $(API_HOST) \
-	--port $(API_PORT) \
-	--reload
+run_dev: stack_up
 
 
 .PHONY: run_prd
 run_prd:
 	@$(VENV_PYTHON) -m uvicorn $(API_MODULE) \
-	--host $(API_HOST) \
-	--port $(API_PORT) \
-	--workers $(API_WORKERS)
+		--host $(API_HOST) \
+		--port $(API_PORT) \
+		--workers $(API_WORKERS)
+
+
+## docker helpers
+.PHONY: api_up
+api_up:
+	@$(COMPOSE) up --build --detach api
+	@echo "API running via docker compose; use `make logs_api` to follow logs."
+
+
+.PHONY: api_stop
+api_stop:
+	@$(COMPOSE) stop api
+
+
+.PHONY: api_restart
+api_restart:
+	@$(COMPOSE) restart api
+
 
 .PHONY: db_up
 db_up:
 	@$(COMPOSE) up -d postgres
 
 
-.PHONY: db_down
-db_down:
+.PHONY: db_stop
+db_stop:
 	@$(COMPOSE) stop postgres
+
+
+.PHONY: db_restart
+db_restart:
+	@$(COMPOSE) restart postgres
 
 
 .PHONY: obs_up
@@ -112,9 +135,14 @@ obs_up:
 	@echo "Jaeger UI: http://localhost:16686"
 
 
-.PHONY: obs_down
-obs_down:
+.PHONY: obs_stop
+obs_stop:
 	@$(COMPOSE) stop jaeger
+
+
+.PHONY: obs_restart
+obs_restart:
+	@$(COMPOSE) restart jaeger
 
 
 .PHONY: llm_up
@@ -124,11 +152,64 @@ llm_up:
 	@echo "Ollama model ready: $(OLLAMA_DEFAULT_MODEL)"
 
 
-.PHONY: llm_down
-llm_down:
+.PHONY: llm_stop
+llm_stop:
 	@$(COMPOSE) stop ollama ollama-init
 
 
+.PHONY: llm_restart
+llm_restart:
+	@$(COMPOSE) restart ollama ollama-init
+
+
+.PHONY: stack_up
+stack_up:
+	@$(COMPOSE) up --build --detach
+	@echo "Full stack running; use `make logs_stack` to follow every service."
+
+
+.PHONY: stack_stop
+stack_stop:
+	@$(COMPOSE) stop api postgres jaeger ollama ollama-init
+
+
+.PHONY: stack_restart
+stack_restart:
+	@$(COMPOSE) restart api postgres jaeger ollama ollama-init
+
+
+.PHONY: stack_down
+stack_down:
+	@$(COMPOSE) down --remove-orphans
+
+
+## logs
+.PHONY: logs_api
+logs_api:
+	@$(COMPOSE) logs --follow api
+
+
+.PHONY: logs_db
+logs_db:
+	@$(COMPOSE) logs --follow postgres
+
+
+.PHONY: logs_obs
+logs_obs:
+	@$(COMPOSE) logs --follow jaeger
+
+
+.PHONY: logs_llm
+logs_llm:
+	@$(COMPOSE) logs --follow ollama
+
+
+.PHONY: logs_stack
+logs_stack:
+	@$(COMPOSE) logs --follow
+
+
+## cleanup
 .PHONY: clean
 clean:
 	@echo "Cleaning Python cache files..."

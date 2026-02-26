@@ -6,12 +6,6 @@
 - [ ] Move endpoint orchestration into service layer.
 - [ ] Keep endpoint functions as pure HTTP adapters.
 
-### Baseline Documentation + Images
-- [ ] Document in README/Make docs that `docker compose up` bootstraps models via `ollama-init`.
-- [ ] Clarify `llm_up` vs full stack startup behavior.
-- [ ] Pin container image tags (replace `latest` for Ollama/Jaeger with explicit versions).
-- [ ] Document image upgrade policy.
-
 ## P1 - Product Features + Safety
 
 ### Prompting v1 (Opt-in)
