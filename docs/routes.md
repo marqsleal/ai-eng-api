@@ -56,6 +56,20 @@ Expected output (200):
 {"id":"<uuid>","email":"ana@example.com","created_at":"<iso-datetime>","is_active":true}
 ```
 
+### PATCH /users/{user_id}
+
+```bash
+curl -s -X PATCH http://localhost:8000/users/<user_id> \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"bea@example.com"}'
+```
+
+Expected output (200):
+
+```json
+{"id":"<uuid>","email":"bea@example.com","created_at":"<iso-datetime>","is_active":true}
+```
+
 ## Model Versions
 
 ### POST /model-versions
@@ -94,6 +108,20 @@ Expected output (200):
 
 ```json
 {"id":"<uuid>","provider":"openai","model_name":"gpt-4.1","version_tag":"2026-02-25","created_at":"<iso-datetime>","is_active":true}
+```
+
+### PATCH /model-versions/{model_version_id}
+
+```bash
+curl -s -X PATCH http://localhost:8000/model-versions/<model_version_id> \
+  -H 'Content-Type: application/json' \
+  -d '{"version_tag":"2026-02-26"}'
+```
+
+Expected output (200):
+
+```json
+{"id":"<uuid>","provider":"openai","model_name":"gpt-4.1","version_tag":"2026-02-26","created_at":"<iso-datetime>","is_active":true}
 ```
 
 ## Conversations
@@ -161,6 +189,20 @@ Expected output (200):
 
 ```json
 {"id":"<uuid>","user_id":"<uuid>","model_version_id":"<uuid>","prompt":"hello","response":"world","created_at":"<iso-datetime>","is_active":true}
+```
+
+### PATCH /conversations/{conversation_id}
+
+```bash
+curl -s -X PATCH http://localhost:8000/conversations/<conversation_id> \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"new prompt","temperature":0.3}'
+```
+
+Expected output (200):
+
+```json
+{"id":"<uuid>","user_id":"<uuid>","model_version_id":"<uuid>","prompt":"new prompt","response":"world","temperature":0.3,"created_at":"<iso-datetime>","is_active":true}
 ```
 
 ## Negative Example

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.model_version import ModelVersionCreate, ModelVersionRead
+from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch, ModelVersionRead
 from app.database.dependencies import get_db
 from app.models.model_version import ModelVersion
 
@@ -81,4 +81,29 @@ async def get_model_version(model_version_id: UUID, db: DBSession):
     model_version = result.scalar_one_or_none()
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    return model_version
+
+
+@model_versions_router.patch("/{model_version_id}", response_model=ModelVersionRead)
+async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch, db: DBSession):
+    """Partially update a model version by UUID."""
+    result = await db.execute(
+        select(ModelVersion).where(
+            ModelVersion.id == model_version_id,
+            ModelVersion.is_active.is_(True),
+        )
+    )
+    model_version = result.scalar_one_or_none()
+    if model_version is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        return model_version
+
+    for field, value in updates.items():
+        setattr(model_version, field, value)
+
+    await db.commit()
+    await db.refresh(model_version)
     return model_version

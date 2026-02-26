@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.conversation import ConversationCreate, ConversationRead
+from app.api.schemas.conversation import ConversationCreate, ConversationPatch, ConversationRead
 from app.database.dependencies import get_db
 from app.models.conversation import Conversation
 from app.models.model_version import ModelVersion
@@ -92,4 +92,48 @@ async def get_conversation(conversation_id: UUID, db: DBSession):
     conversation = result.scalar_one_or_none()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+@conversations_router.patch("/{conversation_id}", response_model=ConversationRead)
+async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, db: DBSession):
+    """Partially update a conversation by UUID."""
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.is_active.is_(True),
+        )
+    )
+    conversation = result.scalar_one_or_none()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        return conversation
+
+    if "user_id" in updates:
+        user_result = await db.execute(
+            select(User).where(User.id == updates["user_id"], User.is_active.is_(True))
+        )
+        user = user_result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+    if "model_version_id" in updates:
+        model_version_result = await db.execute(
+            select(ModelVersion).where(
+                ModelVersion.id == updates["model_version_id"],
+                ModelVersion.is_active.is_(True),
+            )
+        )
+        model_version = model_version_result.scalar_one_or_none()
+        if model_version is None:
+            raise HTTPException(status_code=404, detail="Model version not found")
+
+    for field, value in updates.items():
+        setattr(conversation, field, value)
+
+    await db.commit()
+    await db.refresh(conversation)
     return conversation

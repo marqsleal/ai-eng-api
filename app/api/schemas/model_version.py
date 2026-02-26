@@ -10,6 +10,12 @@ class ModelVersionCreate(BaseModel):
     version_tag: str
 
 
+class ModelVersionPatch(BaseModel):
+    provider: str | None = None
+    model_name: str | None = None
+    version_tag: str | None = None
+
+
 class ModelVersionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

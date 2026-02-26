@@ -8,6 +8,10 @@ class UserCreate(BaseModel):
     email: str
 
 
+class UserPatch(BaseModel):
+    email: str | None = None
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

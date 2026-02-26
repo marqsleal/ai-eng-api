@@ -10,16 +10,18 @@ from app.api.endpoints.conversations import (
     create_conversation,
     get_conversation,
     list_conversations,
+    patch_conversation,
 )
 from app.api.endpoints.model_versions import (
     create_model_version,
     get_model_version,
     list_model_versions,
+    patch_model_version,
 )
-from app.api.endpoints.users import create_user, get_user
-from app.api.schemas.conversation import ConversationCreate
-from app.api.schemas.model_version import ModelVersionCreate
-from app.api.schemas.user import UserCreate
+from app.api.endpoints.users import create_user, get_user, patch_user
+from app.api.schemas.conversation import ConversationCreate, ConversationPatch
+from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch
+from app.api.schemas.user import UserCreate, UserPatch
 from app.models.conversation import Conversation
 from app.models.model_version import ModelVersion
 from app.models.user import User
@@ -204,3 +206,58 @@ async def test_get_missing_conversation_returns_404(fake_db: FakeAsyncDB):
         await get_conversation(uuid4(), fake_db)
     assert err.value.status_code == 404
     assert err.value.detail == "Conversation not found"
+
+
+async def test_patch_user_updates_email(fake_db: FakeAsyncDB):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+
+    updated = await patch_user(user.id, UserPatch(email="bea@example.com"), fake_db)
+
+    assert updated.email == "bea@example.com"
+
+
+async def test_patch_model_version_updates_version_tag(fake_db: FakeAsyncDB):
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+
+    updated = await patch_model_version(
+        model_version.id, ModelVersionPatch(version_tag="2026-02-26"), fake_db
+    )
+
+    assert updated.version_tag == "2026-02-26"
+
+
+async def test_patch_conversation_updates_prompt_and_temperature(fake_db: FakeAsyncDB):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="old",
+            response="world",
+            temperature=0.1,
+        ),
+        fake_db,
+    )
+
+    updated = await patch_conversation(
+        conversation.id,
+        ConversationPatch(prompt="new", temperature=0.3),
+        fake_db,
+    )
+
+    assert updated.prompt == "new"
+    assert updated.temperature == 0.3
+
+
+async def test_patch_missing_user_returns_404(fake_db: FakeAsyncDB):
+    with pytest.raises(HTTPException) as err:
+        await patch_user(uuid4(), UserPatch(email="x@example.com"), fake_db)
+    assert err.value.status_code == 404
+    assert err.value.detail == "User not found"

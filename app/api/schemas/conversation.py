@@ -18,6 +18,20 @@ class ConversationCreate(BaseModel):
     latency_ms: int | None = None
 
 
+class ConversationPatch(BaseModel):
+    user_id: UUID | None = None
+    model_version_id: UUID | None = None
+    prompt: str | None = None
+    response: str | None = None
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    latency_ms: int | None = None
+
+
 class ConversationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.user import UserCreate, UserRead
+from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.database.dependencies import get_db
 from app.models.user import User
 
@@ -65,4 +65,29 @@ async def get_user(user_id: UUID, db: DBSession):
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@users_router.patch("/{user_id}", response_model=UserRead)
+async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
+    """Partially update a user by UUID."""
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        return user
+
+    for field, value in updates.items():
+        setattr(user, field, value)
+
+    try:
+        await db.commit()
+    except IntegrityError as err:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Email already exists") from err
+
+    await db.refresh(user)
     return user
