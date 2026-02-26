@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,11 +7,11 @@ from app.api.endpoints.conversations import conversations_router
 from app.api.endpoints.health import health_router
 from app.api.endpoints.model_versions import model_versions_router
 from app.api.endpoints.users import users_router
-from app.core.logging import get_logger, setup_logging
+from app.core.logging import setup_logging
 from app.core.settings import settings
 
 setup_logging()
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # TODO: integrate mypi with strict mode
 

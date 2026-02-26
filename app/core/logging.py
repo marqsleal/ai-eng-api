@@ -95,26 +95,3 @@ def setup_logging() -> None:
     }
 
     logging.config.dictConfig(logging_config)
-
-
-def get_logger(name: str) -> logging.Logger:
-    """
-    Retrieve a module-scoped logger instance.
-
-    This function provides a consistent mechanism for obtaining
-    logger instances across the application while maintaining
-    centralized configuration control.
-
-    Args:
-        name (str):
-            The logger name. Typically use `__name__` for
-            module-level traceability.
-
-    Returns:
-        logging.Logger:
-            Configured logger instance inheriting global settings.
-
-    Example:
-        `logger = get_logger(__name__)`
-    """
-    return logging.getLogger(name)

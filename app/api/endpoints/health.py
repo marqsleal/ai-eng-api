@@ -1,14 +1,14 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.logging import get_logger
 from app.core.settings import Environment, settings
 from app.database.dependencies import get_db
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 health_router = APIRouter()
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
