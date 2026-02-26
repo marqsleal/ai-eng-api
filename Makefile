@@ -1,23 +1,28 @@
-include .env
+-include .env
+
+SHELL := /bin/bash
 
 ############################################################################################
 # GLOBALS                                                                                  #
 ############################################################################################
 
-PROJECT_NAME= ai-eng-api
-PYTHON_INTERPRETER= python
-PYTHON_VER= 3.13
+PYTHON_INTERPRETER = python
+PYTHON_VER = 3.13
+PYTHON = $(PYTHON_INTERPRETER)$(PYTHON_VER)
+COMPOSE = docker compose
 
-VENV_NAME= .venv
-VENV_BIN= $(VENV_NAME)/bin
-POETRY = $(VENV_BIN)/python -m poetry
+VENV_NAME = .venv
+VENV_BIN = $(VENV_NAME)/bin
+VENV_PYTHON = $(VENV_BIN)/python
+POETRY = $(VENV_PYTHON) -m poetry
 
-APP_DIR= app
-TEST_DIR= tests
+APP_DIR = app
+TEST_DIR = tests
 
 API_MODULE = $(APP_DIR).main:app
 API_HOST = 0.0.0.0
 API_PORT = 8000
+API_WORKERS = 4
 
 ############################################################################################
 # COMMANDS                                                                                 #
@@ -27,11 +32,11 @@ API_PORT = 8000
 .PHONY: project_init
 project_init: 
 	@echo "Creating Python Virtual Environment"
-	@$(PYTHON_INTERPRETER)$(PYTHON_VER) -m venv $(VENV_NAME)
-	@$(VENV_BIN)/python -m ensurepip --upgrade
-	@$(VENV_BIN)/python -m pip install --upgrade pip setuptools wheel
+	@$(PYTHON) -m venv $(VENV_NAME)
+	@$(VENV_PYTHON) -m ensurepip --upgrade
+	@$(VENV_PYTHON) -m pip install --upgrade pip setuptools wheel
 	@echo "Installing Poetry"
-	@$(VENV_BIN)/python -m pip install poetry
+	@$(VENV_PYTHON) -m pip install poetry
 	@echo "Installing dependencies"
 	@$(POETRY) install
 	@echo "Virtual Environment Created!"
@@ -46,39 +51,39 @@ poetry_reinstall:
 
 .PHONY: lint
 lint:
-	@$(VENV_BIN)/python -m ruff check $(APP_DIR) $(TEST_DIR)
-	@$(VENV_BIN)/python -m ruff format --check $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff check $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff format --check $(APP_DIR) $(TEST_DIR)
 
 
 .PHONY: format
 format:
-	@$(VENV_BIN)/python -m ruff check --fix $(APP_DIR) $(TEST_DIR)
-	@$(VENV_BIN)/python -m ruff format $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff check --fix $(APP_DIR) $(TEST_DIR)
+	@$(VENV_PYTHON) -m ruff format $(APP_DIR) $(TEST_DIR)
 
 
 .PHONY: alembic_init
 alembic_init:
-	@$(VENV_BIN)/python -m alembic init migrations
+	@$(VENV_PYTHON) -m alembic init migrations
 
 
 .PHONY: alembic_upgrade
 alembic_upgrade:
-	@$(VENV_BIN)/python -m alembic upgrade head
+	@$(VENV_PYTHON) -m alembic upgrade head
 
 
 .PHONY: alembic_migrate
 alembic_migrate:
-	@$(VENV_BIN)/python -m alembic revision --autogenerate -m "$(msg)"
+	@$(VENV_PYTHON) -m alembic revision --autogenerate -m "$(msg)"
 
 
 .PHONY: run_test
 run_test:
-	@$(VENV_BIN)/python -m pytest tests
+	@$(VENV_PYTHON) -m pytest $(TEST_DIR)
 
 
 .PHONY: run_dev
 run_dev:
-	@$(VENV_BIN)/python -m uvicorn $(API_MODULE) \
+	@$(VENV_PYTHON) -m uvicorn $(API_MODULE) \
 	--host $(API_HOST) \
 	--port $(API_PORT) \
 	--reload
@@ -86,41 +91,42 @@ run_dev:
 
 .PHONY: run_prd
 run_prd:
-	@$(VENV_BIN)/python -m uvicorn $(APP_DIR).main:app \
-	--host 0.0.0.0 \
-	--port 8000 \
-	--workers 4
+	@$(VENV_PYTHON) -m uvicorn $(API_MODULE) \
+	--host $(API_HOST) \
+	--port $(API_PORT) \
+	--workers $(API_WORKERS)
 
 .PHONY: db_up
 db_up:
-	@docker compose up -d postgres
+	@$(COMPOSE) up -d postgres
 
 
 .PHONY: db_down
 db_down:
-	@docker compose stop postgres
+	@$(COMPOSE) stop postgres
 
 
 .PHONY: obs_up
 obs_up:
-	@docker compose up -d jaeger
+	@$(COMPOSE) up -d jaeger
 	@echo "Jaeger UI: http://localhost:16686"
 
 
 .PHONY: obs_down
 obs_down:
-	@docker compose stop jaeger
+	@$(COMPOSE) stop jaeger
 
 
 .PHONY: llm_up
 llm_up:
-	@docker compose up -d ollama
+	@$(COMPOSE) up -d ollama ollama-init
 	@echo "Ollama API: http://localhost:11434"
+	@echo "Ollama model ready: $(OLLAMA_DEFAULT_MODEL)"
 
 
 .PHONY: llm_down
 llm_down:
-	@docker compose stop ollama
+	@$(COMPOSE) stop ollama ollama-init
 
 
 .PHONY: clean

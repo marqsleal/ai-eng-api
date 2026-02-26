@@ -29,10 +29,28 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    environment:
+      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL}
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until ollama list >/dev/null 2>&1; do
+          sleep 1
+        done
+        ollama pull "${OLLAMA_DEFAULT_MODEL}"
 
   api:
     build:
@@ -44,11 +62,16 @@ services:
     environment:
       POSTGRES_HOSTNAME: postgres
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
       jaeger:
         condition: service_started
+      ollama:
+        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
 

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     REDIS_URL: str | None = None
     VECTOR_DB_URL: str | None = None
+    OLLAMA_BASE_URL: str = Field(default="http://localhost:11434")
+    OLLAMA_DEFAULT_MODEL: str = Field(default="llama3.2:3b")
+    OLLAMA_TIMEOUT_SECONDS: float = Field(default=30.0)
 
     VERSION: str = Field(default="1.0.0")
     OTEL_EXPORTER_OTLP_ENDPOINT: str

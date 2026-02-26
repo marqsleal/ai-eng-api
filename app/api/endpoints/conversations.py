@@ -9,6 +9,13 @@ from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
 from app.repositories.model_version import ModelVersionRepository
 from app.repositories.user import UserRepository
+from app.services.llm.base import (
+    LLMError,
+    LLMProviderNotSupportedError,
+    LLMResponseValidationError,
+    LLMTransportError,
+)
+from app.services.llm.service import generate_conversation_response
 
 conversations_router = APIRouter(prefix="/conversations", tags=["conversations"])
 DBSession = Annotated[AsyncSession, Depends(get_db)]
@@ -23,7 +30,7 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
       "user_id": "<uuid>",
       "model_version_id": "<uuid>",
       "prompt": "hello",
-      "response": "world",
+      "response": "world (optional, generated when omitted)",
       "temperature": 0.2
     }
 
@@ -41,7 +48,31 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
-    conversation = await conversation_repository.create(payload.model_dump())
+    conversation_data = payload.model_dump()
+    should_generate_response = payload.response is None or payload.response.strip() == ""
+    if should_generate_response:
+        try:
+            llm_response = await generate_conversation_response(
+                model_version=model_version,
+                prompt=payload.prompt,
+                temperature=payload.temperature,
+                top_p=payload.top_p,
+                max_tokens=payload.max_tokens,
+            )
+        except LLMProviderNotSupportedError as err:
+            raise HTTPException(status_code=400, detail=str(err)) from err
+        except (LLMTransportError, LLMResponseValidationError) as err:
+            raise HTTPException(status_code=503, detail="LLM provider unavailable") from err
+        except LLMError as err:
+            raise HTTPException(status_code=503, detail=str(err)) from err
+
+        conversation_data["response"] = llm_response.response
+        conversation_data["input_tokens"] = llm_response.input_tokens
+        conversation_data["output_tokens"] = llm_response.output_tokens
+        conversation_data["total_tokens"] = llm_response.total_tokens
+        conversation_data["latency_ms"] = llm_response.latency_ms
+
+    conversation = await conversation_repository.create(conversation_data)
     await db.commit()
     await db.refresh(conversation)
     return conversation

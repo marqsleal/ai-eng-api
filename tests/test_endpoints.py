@@ -27,6 +27,7 @@ from app.api.schemas.user import UserCreate, UserPatch
 from app.models.conversation import Conversation
 from app.models.model_version import ModelVersion
 from app.models.user import User
+from app.services.llm.base import LLMGenerationResult
 
 
 class FakeResultScalars:
@@ -211,6 +212,73 @@ async def test_create_conversation_missing_user_returns_404(fake_db: FakeAsyncDB
         )
     assert err.value.status_code == 404
     assert err.value.detail == "User not found"
+
+
+async def test_create_conversation_generates_response_when_missing(
+    fake_db: FakeAsyncDB, monkeypatch
+):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(
+            provider="ollama",
+            model_name="llama3.1:8b-instruct",
+            version_tag="v1",
+        ),
+        fake_db,
+    )
+
+    async def fake_generate_conversation_response(**_kwargs):
+        return LLMGenerationResult(
+            response="generated response",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            latency_ms=50,
+        )
+
+    monkeypatch.setattr(
+        "app.api.endpoints.conversations.generate_conversation_response",
+        fake_generate_conversation_response,
+    )
+
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="hello",
+            response=None,
+        ),
+        fake_db,
+    )
+
+    assert conversation.response == "generated response"
+    assert conversation.input_tokens == 10
+    assert conversation.output_tokens == 5
+    assert conversation.total_tokens == 15
+    assert conversation.latency_ms == 50
+
+
+async def test_create_conversation_missing_response_unsupported_provider_returns_400(
+    fake_db: FakeAsyncDB,
+):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="v1"),
+        fake_db,
+    )
+
+    with pytest.raises(HTTPException) as err:
+        await create_conversation(
+            ConversationCreate(
+                user_id=user.id,
+                model_version_id=model_version.id,
+                prompt="hello",
+                response=None,
+            ),
+            fake_db,
+        )
+    assert err.value.status_code == 400
+    assert "Unsupported LLM provider" in err.value.detail
 
 
 async def test_get_missing_conversation_returns_404(fake_db: FakeAsyncDB):
