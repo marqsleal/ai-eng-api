@@ -2,14 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.database.dependencies import get_db
-from app.models.conversation import Conversation
-from app.models.user import User
+from app.repositories.conversation import ConversationRepository
+from app.repositories.user import UserRepository
 
 users_router = APIRouter(prefix="/users", tags=["users"])
 DBSession = Annotated[AsyncSession, Depends(get_db)]
@@ -25,15 +24,12 @@ async def create_user(payload: UserCreate, db: DBSession):
     Expected output (201):
     {"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}
     """
-    user = User(email=payload.email)
-    db.add(user)
+    user_repository = UserRepository(db)
     try:
-        await db.commit()
+        return await user_repository.create(payload.email)
     except IntegrityError as err:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Email already exists") from err
-    await db.refresh(user)
-    return user
 
 
 @users_router.get("", response_model=list[UserRead])
@@ -46,10 +42,8 @@ async def list_users(db: DBSession):
     Expected output (200):
     [{"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}]
     """
-    result = await db.execute(
-        select(User).where(User.is_active.is_(True)).order_by(User.created_at.desc())
-    )
-    return result.scalars().all()
+    user_repository = UserRepository(db)
+    return await user_repository.list_active()
 
 
 @users_router.get("/{user_id}", response_model=UserRead)
@@ -62,8 +56,8 @@ async def get_user(user_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}
     """
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
-    user = result.scalar_one_or_none()
+    user_repository = UserRepository(db)
+    user = await user_repository.get_active_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -81,8 +75,8 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
     {"id": "<uuid>", "email": "bea@example.com", "created_at": "<iso-datetime>",
     "is_active": true}
     """
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
-    user = result.scalar_one_or_none()
+    user_repository = UserRepository(db)
+    user = await user_repository.get_active_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -94,12 +88,11 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
         setattr(user, field, value)
 
     try:
-        await db.commit()
+        await user_repository.persist(user)
     except IntegrityError as err:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Email already exists") from err
 
-    await db.refresh(user)
     return user
 
 
@@ -115,18 +108,14 @@ async def delete_user(user_id: UUID, db: DBSession):
     Expected output (204):
     No Content
     """
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
-    user = result.scalar_one_or_none()
+    user_repository = UserRepository(db)
+    conversation_repository = ConversationRepository(db)
+
+    user = await user_repository.get_active_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
     user.is_active = False
-    conversations_result = await db.execute(
-        select(Conversation).where(
-            Conversation.user_id == user_id,
-            Conversation.is_active.is_(True),
-        )
-    )
-    for conversation in conversations_result.scalars().all():
+    for conversation in await conversation_repository.list_active_by_user_id(user_id):
         conversation.is_active = False
-    await db.commit()
+    await conversation_repository.commit()

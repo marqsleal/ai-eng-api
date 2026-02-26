@@ -2,14 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.conversation import ConversationCreate, ConversationPatch, ConversationRead
 from app.database.dependencies import get_db
-from app.models.conversation import Conversation
-from app.models.model_version import ModelVersion
-from app.models.user import User
+from app.repositories.conversation import ConversationRepository
+from app.repositories.model_version import ModelVersionRepository
+from app.repositories.user import UserRepository
 
 conversations_router = APIRouter(prefix="/conversations", tags=["conversations"])
 DBSession = Annotated[AsyncSession, Depends(get_db)]
@@ -31,27 +30,18 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
     Expected output (201):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    user_result = await db.execute(
-        select(User).where(User.id == payload.user_id, User.is_active.is_(True))
-    )
-    user = user_result.scalar_one_or_none()
+    user_repository = UserRepository(db)
+    model_version_repository = ModelVersionRepository(db)
+    conversation_repository = ConversationRepository(db)
+
+    user = await user_repository.get_active_by_id(payload.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    model_version_result = await db.execute(
-        select(ModelVersion).where(
-            ModelVersion.id == payload.model_version_id,
-            ModelVersion.is_active.is_(True),
-        )
-    )
-    model_version = model_version_result.scalar_one_or_none()
+    model_version = await model_version_repository.get_active_by_id(payload.model_version_id)
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
-    conversation = Conversation(**payload.model_dump())
-    db.add(conversation)
-    await db.commit()
-    await db.refresh(conversation)
-    return conversation
+    return await conversation_repository.create(payload.model_dump())
 
 
 @conversations_router.get("", response_model=list[ConversationRead])
@@ -65,12 +55,8 @@ async def list_conversations(db: DBSession, user_id: UUID | None = None):
     Expected output (200):
     [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}]
     """
-    query = select(Conversation).where(Conversation.is_active.is_(True))
-    if user_id is not None:
-        query = query.where(Conversation.user_id == user_id)
-    query = query.order_by(Conversation.created_at.desc())
-    result = await db.execute(query)
-    return result.scalars().all()
+    conversation_repository = ConversationRepository(db)
+    return await conversation_repository.list_active(user_id=user_id)
 
 
 @conversations_router.get("/{conversation_id}", response_model=ConversationRead)
@@ -83,13 +69,8 @@ async def get_conversation(conversation_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    result = await db.execute(
-        select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.is_active.is_(True),
-        )
-    )
-    conversation = result.scalar_one_or_none()
+    conversation_repository = ConversationRepository(db)
+    conversation = await conversation_repository.get_active_by_id(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
@@ -107,13 +88,10 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "new prompt",
     "response": "world", "temperature": 0.3, "created_at": "<iso-datetime>", "is_active": true}
     """
-    result = await db.execute(
-        select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.is_active.is_(True),
-        )
-    )
-    conversation = result.scalar_one_or_none()
+    conversation_repository = ConversationRepository(db)
+    user_repository = UserRepository(db)
+    model_version_repository = ModelVersionRepository(db)
+    conversation = await conversation_repository.get_active_by_id(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -122,29 +100,19 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
         return conversation
 
     if "user_id" in updates:
-        user_result = await db.execute(
-            select(User).where(User.id == updates["user_id"], User.is_active.is_(True))
-        )
-        user = user_result.scalar_one_or_none()
+        user = await user_repository.get_active_by_id(updates["user_id"])
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
     if "model_version_id" in updates:
-        model_version_result = await db.execute(
-            select(ModelVersion).where(
-                ModelVersion.id == updates["model_version_id"],
-                ModelVersion.is_active.is_(True),
-            )
-        )
-        model_version = model_version_result.scalar_one_or_none()
+        model_version = await model_version_repository.get_active_by_id(updates["model_version_id"])
         if model_version is None:
             raise HTTPException(status_code=404, detail="Model version not found")
 
     for field, value in updates.items():
         setattr(conversation, field, value)
 
-    await db.commit()
-    await db.refresh(conversation)
+    await conversation_repository.persist(conversation)
     return conversation
 
 
@@ -158,15 +126,10 @@ async def delete_conversation(conversation_id: UUID, db: DBSession):
     Expected output (204):
     No Content
     """
-    result = await db.execute(
-        select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.is_active.is_(True),
-        )
-    )
-    conversation = result.scalar_one_or_none()
+    conversation_repository = ConversationRepository(db)
+    conversation = await conversation_repository.get_active_by_id(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     conversation.is_active = False
-    await db.commit()
+    await conversation_repository.commit()

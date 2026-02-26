@@ -2,13 +2,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch, ModelVersionRead
 from app.database.dependencies import get_db
-from app.models.conversation import Conversation
-from app.models.model_version import ModelVersion
+from app.repositories.conversation import ConversationRepository
+from app.repositories.model_version import ModelVersionRepository
 
 model_versions_router = APIRouter(prefix="/model-versions", tags=["model-versions"])
 DBSession = Annotated[AsyncSession, Depends(get_db)]
@@ -34,15 +33,12 @@ async def create_model_version(payload: ModelVersionCreate, db: DBSession):
       "created_at": "<iso-datetime>"
     }
     """
-    model_version = ModelVersion(
+    model_version_repository = ModelVersionRepository(db)
+    return await model_version_repository.create(
         provider=payload.provider,
         model_name=payload.model_name,
         version_tag=payload.version_tag,
     )
-    db.add(model_version)
-    await db.commit()
-    await db.refresh(model_version)
-    return model_version
 
 
 @model_versions_router.get("", response_model=list[ModelVersionRead])
@@ -55,12 +51,8 @@ async def list_model_versions(db: DBSession):
     Expected output (200):
     [{"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "v1"}]
     """
-    result = await db.execute(
-        select(ModelVersion)
-        .where(ModelVersion.is_active.is_(True))
-        .order_by(ModelVersion.created_at.desc())
-    )
-    return result.scalars().all()
+    model_version_repository = ModelVersionRepository(db)
+    return await model_version_repository.list_active()
 
 
 @model_versions_router.get("/{model_version_id}", response_model=ModelVersionRead)
@@ -73,13 +65,8 @@ async def get_model_version(model_version_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "v1"}
     """
-    result = await db.execute(
-        select(ModelVersion).where(
-            ModelVersion.id == model_version_id,
-            ModelVersion.is_active.is_(True),
-        )
-    )
-    model_version = result.scalar_one_or_none()
+    model_version_repository = ModelVersionRepository(db)
+    model_version = await model_version_repository.get_active_by_id(model_version_id)
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     return model_version
@@ -97,13 +84,8 @@ async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch
     {"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "2026-02-26",
     "created_at": "<iso-datetime>", "is_active": true}
     """
-    result = await db.execute(
-        select(ModelVersion).where(
-            ModelVersion.id == model_version_id,
-            ModelVersion.is_active.is_(True),
-        )
-    )
-    model_version = result.scalar_one_or_none()
+    model_version_repository = ModelVersionRepository(db)
+    model_version = await model_version_repository.get_active_by_id(model_version_id)
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
@@ -114,8 +96,7 @@ async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch
     for field, value in updates.items():
         setattr(model_version, field, value)
 
-    await db.commit()
-    await db.refresh(model_version)
+    await model_version_repository.persist(model_version)
     return model_version
 
 
@@ -131,23 +112,16 @@ async def delete_model_version(model_version_id: UUID, db: DBSession):
     Expected output (204):
     No Content
     """
-    result = await db.execute(
-        select(ModelVersion).where(
-            ModelVersion.id == model_version_id,
-            ModelVersion.is_active.is_(True),
-        )
-    )
-    model_version = result.scalar_one_or_none()
+    model_version_repository = ModelVersionRepository(db)
+    conversation_repository = ConversationRepository(db)
+    model_version = await model_version_repository.get_active_by_id(model_version_id)
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
     model_version.is_active = False
-    conversations_result = await db.execute(
-        select(Conversation).where(
-            Conversation.model_version_id == model_version_id,
-            Conversation.is_active.is_(True),
-        )
+    conversations = await conversation_repository.list_active_by_model_version_id(
+        model_version_id
     )
-    for conversation in conversations_result.scalars().all():
+    for conversation in conversations:
         conversation.is_active = False
-    await db.commit()
+    await conversation_repository.commit()
