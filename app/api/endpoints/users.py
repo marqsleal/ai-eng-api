@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.database.dependencies import get_db
+from app.models.conversation import Conversation
 from app.models.user import User
 
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -106,6 +107,8 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
 async def delete_user(user_id: UUID, db: DBSession):
     """Soft delete a user by UUID.
 
+    Related active conversations are also soft deleted.
+
     Expected request:
     DELETE /users/{user_id}
 
@@ -118,4 +121,12 @@ async def delete_user(user_id: UUID, db: DBSession):
         raise HTTPException(status_code=404, detail="User not found")
 
     user.is_active = False
+    conversations_result = await db.execute(
+        select(Conversation).where(
+            Conversation.user_id == user_id,
+            Conversation.is_active.is_(True),
+        )
+    )
+    for conversation in conversations_result.scalars().all():
+        conversation.is_active = False
     await db.commit()

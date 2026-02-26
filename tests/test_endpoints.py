@@ -274,21 +274,62 @@ async def test_patch_missing_user_returns_404(fake_db: FakeAsyncDB):
 
 async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="hello",
+            response="world",
+        ),
+        fake_db,
+    )
 
     await delete_user(user.id, fake_db)
 
     assert user.is_active is False
+    assert conversation.is_active is False
+
+    conversations = await list_conversations(fake_db, user_id=user.id)
+    assert conversations == []
+
+    with pytest.raises(HTTPException) as err:
+        await get_conversation(conversation.id, fake_db)
+    assert err.value.status_code == 404
+    assert err.value.detail == "Conversation not found"
 
 
 async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="hello",
+            response="world",
+        ),
         fake_db,
     )
 
     await delete_model_version(model_version.id, fake_db)
 
     assert model_version.is_active is False
+    assert conversation.is_active is False
+
+    conversations = await list_conversations(fake_db, user_id=user.id)
+    assert conversations == []
+
+    with pytest.raises(HTTPException) as err:
+        await get_conversation(conversation.id, fake_db)
+    assert err.value.status_code == 404
+    assert err.value.detail == "Conversation not found"
 
 
 async def test_delete_conversation_soft_deletes(fake_db: FakeAsyncDB):

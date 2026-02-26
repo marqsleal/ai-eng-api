@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch, ModelVersionRead
 from app.database.dependencies import get_db
+from app.models.conversation import Conversation
 from app.models.model_version import ModelVersion
 
 model_versions_router = APIRouter(prefix="/model-versions", tags=["model-versions"])
@@ -122,6 +123,8 @@ async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch
 async def delete_model_version(model_version_id: UUID, db: DBSession):
     """Soft delete a model version by UUID.
 
+    Related active conversations are also soft deleted.
+
     Expected request:
     DELETE /model-versions/{model_version_id}
 
@@ -139,4 +142,12 @@ async def delete_model_version(model_version_id: UUID, db: DBSession):
         raise HTTPException(status_code=404, detail="Model version not found")
 
     model_version.is_active = False
+    conversations_result = await db.execute(
+        select(Conversation).where(
+            Conversation.model_version_id == model_version_id,
+            Conversation.is_active.is_(True),
+        )
+    )
+    for conversation in conversations_result.scalars().all():
+        conversation.is_active = False
     await db.commit()
