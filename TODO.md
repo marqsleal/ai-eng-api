@@ -3,8 +3,8 @@
 ## P0 - Critical Foundation
 
 ### API Contract Consistency
-- [ ] Define standard error schema: `code`, `message`, `details`.
-- [ ] Add global exception handlers to enforce consistent error payloads.
+- [x] Define standard error schema: `code`, `message`, `details`.
+- [x] Add global exception handlers to enforce consistent error payloads.
 - [ ] Add typed query schemas for list routes: `limit`, `offset`, `order_by`.
 - [ ] Preserve backward compatibility for existing clients.
 

@@ -7,6 +7,7 @@ from app.api.endpoints.conversations import conversations_router
 from app.api.endpoints.health import health_router
 from app.api.endpoints.model_versions import model_versions_router
 from app.api.endpoints.users import users_router
+from app.core.errors import register_exception_handlers
 from app.core.logging import setup_logging
 from app.core.settings import settings
 from app.core.swagger import resolve_docs_config
@@ -50,6 +51,7 @@ def app_factory() -> FastAPI:
             "defaultModelsExpandDepth": 1,
         },
     )
+    register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(users_router)
     app.include_router(model_versions_router)
