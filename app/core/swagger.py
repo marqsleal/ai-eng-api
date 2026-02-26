@@ -21,8 +21,7 @@ def resolve_docs_config(config: Settings) -> DocsConfig:
 
     if docs_url is not None and openapi_url is None:
         logger.warning(
-            "SWAGGER_UI_ENABLED is true, but OPENAPI_ENABLED is false. "
-            "Swagger UI will be disabled."
+            "SWAGGER_UI_ENABLED is true, but OPENAPI_ENABLED is false. Swagger UI will be disabled."
         )
         docs_url = None
 
