@@ -1,7 +1,7 @@
 import logging
 import logging.config
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
@@ -9,22 +9,20 @@ from app.core.settings import LogFormat, settings
 
 
 class LogRecordJsonFormatter(BaseModel):
+    timestamp: str
     level: str
     logger: str
     message: str
     service: str
     environment: str
 
-    @property
-    def timestamp(self):
-        return datetime.now().isoformat()
-
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log_record = LogRecordJsonFormatter(
+            timestamp=datetime.now(UTC).isoformat(),
             level=record.levelname,
-            logger=record.levelname,
+            logger=record.name,
             message=record.getMessage(),
             service=settings.SERVICE_NAME,
             environment=settings.ENVIRONMENT.name,
