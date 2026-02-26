@@ -44,6 +44,20 @@ async def test_openapi_includes_standard_error_response_model():
     )
 
 
+async def test_openapi_includes_typed_list_query_parameters():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(settings.OPENAPI_JSON_PATH)
+
+    payload = response.json()
+    users_list = payload["paths"]["/users"]["get"]
+    parameters = {param["name"]: param for param in users_list["parameters"]}
+    assert "limit" in parameters
+    assert "offset" in parameters
+    assert "order_by" in parameters
+    assert parameters["order_by"]["schema"]["$ref"] == "#/components/schemas/UsersOrderBy"
+
+
 async def test_swagger_ui_is_disabled_when_openapi_is_disabled(monkeypatch):
     monkeypatch.setattr(settings, "SWAGGER_UI_ENABLED", True)
     monkeypatch.setattr(settings, "OPENAPI_ENABLED", False)

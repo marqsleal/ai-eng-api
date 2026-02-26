@@ -5,8 +5,21 @@
 ### API Contract Consistency
 - [x] Define standard error schema: `code`, `message`, `details`.
 - [x] Add global exception handlers to enforce consistent error payloads.
-- [ ] Add typed query schemas for list routes: `limit`, `offset`, `order_by`.
-- [ ] Preserve backward compatibility for existing clients.
+- [x] Add typed query schemas for list routes: `limit`, `offset`, `order_by`.
+
+### API Contract Consistency - Finalization Plan
+- [x] Step 1: Create shared typed query schema(s) for pagination/sorting
+  (`limit`, `offset`, `order_by`) with strict validation and sane defaults.
+- [x] Step 2: Apply typed query schema(s) to all list endpoints:
+  `GET /users`, `GET /model-versions`, `GET /conversations`.
+- [x] Step 3: Define validation rules:
+  unknown `order_by` returns standardized 422 error (no silent fallback).
+- [x] Step 4: Update OpenAPI docs/examples to reflect typed query params.
+- [ ] Step 5: Add tests:
+  valid pagination/sort, boundary values, invalid params (422 contract),
+  and default no-query behavior.
+- [ ] Step 6: Define completion criteria:
+  all list routes use typed query schema + tests passing.
 
 ### Architecture Boundaries
 - [ ] Move endpoint orchestration into service layer.

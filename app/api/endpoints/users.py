@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.schemas.query import UsersListQuery
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
@@ -41,17 +42,25 @@ async def create_user(payload: UserCreate, db: DBSession):
 
 
 @users_router.get("", response_model=list[UserRead])
-async def list_users(db: DBSession):
-    """List all users ordered by newest creation time first.
+async def list_users(
+    db: DBSession,
+    query: Annotated[UsersListQuery, Depends(UsersListQuery)],
+):
+    """List active users with typed pagination and sorting.
 
     Expected request:
     GET /users
+    GET /users?limit=20&offset=0&order_by=created_at_desc
 
     Expected output (200):
     [{"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}]
     """
     user_repository = UserRepository(db)
-    return await user_repository.list_active()
+    return await user_repository.list_active(
+        limit=query.limit,
+        offset=query.offset,
+        order_by=query.order_by.value,
+    )
 
 
 @users_router.get("/{user_id}", response_model=UserRead)

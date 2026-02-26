@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch, ModelVersionRead
+from app.api.schemas.query import ModelVersionsListQuery
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
@@ -50,17 +51,25 @@ async def create_model_version(payload: ModelVersionCreate, db: DBSession):
 
 
 @model_versions_router.get("", response_model=list[ModelVersionRead])
-async def list_model_versions(db: DBSession):
-    """List all model versions ordered by newest creation time first.
+async def list_model_versions(
+    db: DBSession,
+    query: Annotated[ModelVersionsListQuery, Depends(ModelVersionsListQuery)],
+):
+    """List active model versions with typed pagination and sorting.
 
     Expected request:
     GET /model-versions
+    GET /model-versions?limit=20&offset=0&order_by=model_name_asc
 
     Expected output (200):
     [{"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "v1"}]
     """
     model_version_repository = ModelVersionRepository(db)
-    return await model_version_repository.list_active()
+    return await model_version_repository.list_active(
+        limit=query.limit,
+        offset=query.offset,
+        order_by=query.order_by.value,
+    )
 
 
 @model_versions_router.get("/{model_version_id}", response_model=ModelVersionRead)
