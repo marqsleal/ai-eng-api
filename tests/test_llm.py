@@ -231,7 +231,7 @@ async def test_run_ollama_startup_checks_reachability_failure_raises(monkeypatch
     assert "could not reach Ollama" in str(err.value)
 
 
-async def test_run_ollama_startup_checks_strict_missing_default_model_raises(monkeypatch):
+async def test_run_ollama_startup_checks_missing_default_model_raises(monkeypatch):
     async def fake_list_models(self):
         return ["another-model"]
 
