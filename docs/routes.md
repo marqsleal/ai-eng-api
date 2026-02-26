@@ -70,6 +70,16 @@ Expected output (200):
 {"id":"<uuid>","email":"bea@example.com","created_at":"<iso-datetime>","is_active":true}
 ```
 
+### DELETE /users/{user_id}
+
+```bash
+curl -s -X DELETE http://localhost:8000/users/<user_id> -i
+```
+
+Expected output:
+
+- `204 No Content`
+
 ## Model Versions
 
 ### POST /model-versions
@@ -123,6 +133,16 @@ Expected output (200):
 ```json
 {"id":"<uuid>","provider":"openai","model_name":"gpt-4.1","version_tag":"2026-02-26","created_at":"<iso-datetime>","is_active":true}
 ```
+
+### DELETE /model-versions/{model_version_id}
+
+```bash
+curl -s -X DELETE http://localhost:8000/model-versions/<model_version_id> -i
+```
+
+Expected output:
+
+- `204 No Content`
 
 ## Conversations
 
@@ -204,6 +224,16 @@ Expected output (200):
 ```json
 {"id":"<uuid>","user_id":"<uuid>","model_version_id":"<uuid>","prompt":"new prompt","response":"world","temperature":0.3,"created_at":"<iso-datetime>","is_active":true}
 ```
+
+### DELETE /conversations/{conversation_id}
+
+```bash
+curl -s -X DELETE http://localhost:8000/conversations/<conversation_id> -i
+```
+
+Expected output:
+
+- `204 No Content`
 
 ## Negative Example
 

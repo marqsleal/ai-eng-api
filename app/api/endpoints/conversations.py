@@ -97,7 +97,16 @@ async def get_conversation(conversation_id: UUID, db: DBSession):
 
 @conversations_router.patch("/{conversation_id}", response_model=ConversationRead)
 async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, db: DBSession):
-    """Partially update a conversation by UUID."""
+    """Partially update a conversation by UUID.
+
+    Expected request:
+    PATCH /conversations/{conversation_id}
+    {"prompt": "new prompt", "temperature": 0.3}
+
+    Expected output (200):
+    {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "new prompt",
+    "response": "world", "temperature": 0.3, "created_at": "<iso-datetime>", "is_active": true}
+    """
     result = await db.execute(
         select(Conversation).where(
             Conversation.id == conversation_id,
@@ -137,3 +146,27 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
     await db.commit()
     await db.refresh(conversation)
     return conversation
+
+
+@conversations_router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(conversation_id: UUID, db: DBSession):
+    """Soft delete a conversation by UUID.
+
+    Expected request:
+    DELETE /conversations/{conversation_id}
+
+    Expected output (204):
+    No Content
+    """
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.is_active.is_(True),
+        )
+    )
+    conversation = result.scalar_one_or_none()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.is_active = False
+    await db.commit()

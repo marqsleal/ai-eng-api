@@ -8,17 +8,19 @@ from sqlalchemy.sql.elements import TextClause
 
 from app.api.endpoints.conversations import (
     create_conversation,
+    delete_conversation,
     get_conversation,
     list_conversations,
     patch_conversation,
 )
 from app.api.endpoints.model_versions import (
     create_model_version,
+    delete_model_version,
     get_model_version,
     list_model_versions,
     patch_model_version,
 )
-from app.api.endpoints.users import create_user, get_user, patch_user
+from app.api.endpoints.users import create_user, delete_user, get_user, patch_user
 from app.api.schemas.conversation import ConversationCreate, ConversationPatch
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch
 from app.api.schemas.user import UserCreate, UserPatch
@@ -107,7 +109,14 @@ class FakeAsyncDB:
 
         data = list(source)
         for condition in statement._where_criteria:
-            target_value = getattr(getattr(condition, "right", None), "value", None)
+            right = getattr(condition, "right", None)
+            target_value = getattr(right, "value", None)
+            if target_value is None:
+                right_text = str(right).lower()
+                if right_text == "true":
+                    target_value = True
+                elif right_text == "false":
+                    target_value = False
             column_name = getattr(getattr(condition, "left", None), "name", None)
             if target_value is not None and column_name:
                 data = [item for item in data if getattr(item, column_name, None) == target_value]
@@ -261,3 +270,43 @@ async def test_patch_missing_user_returns_404(fake_db: FakeAsyncDB):
         await patch_user(uuid4(), UserPatch(email="x@example.com"), fake_db)
     assert err.value.status_code == 404
     assert err.value.detail == "User not found"
+
+
+async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+
+    await delete_user(user.id, fake_db)
+
+    assert user.is_active is False
+
+
+async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB):
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+
+    await delete_model_version(model_version.id, fake_db)
+
+    assert model_version.is_active is False
+
+
+async def test_delete_conversation_soft_deletes(fake_db: FakeAsyncDB):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
+        fake_db,
+    )
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="hello",
+            response="world",
+        ),
+        fake_db,
+    )
+
+    await delete_conversation(conversation.id, fake_db)
+
+    assert conversation.is_active is False

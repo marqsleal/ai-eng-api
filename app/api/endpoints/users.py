@@ -70,7 +70,16 @@ async def get_user(user_id: UUID, db: DBSession):
 
 @users_router.patch("/{user_id}", response_model=UserRead)
 async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
-    """Partially update a user by UUID."""
+    """Partially update a user by UUID.
+
+    Expected request:
+    PATCH /users/{user_id}
+    {"email": "bea@example.com"}
+
+    Expected output (200):
+    {"id": "<uuid>", "email": "bea@example.com", "created_at": "<iso-datetime>",
+    "is_active": true}
+    """
     result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
     user = result.scalar_one_or_none()
     if user is None:
@@ -91,3 +100,22 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
 
     await db.refresh(user)
     return user
+
+
+@users_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: UUID, db: DBSession):
+    """Soft delete a user by UUID.
+
+    Expected request:
+    DELETE /users/{user_id}
+
+    Expected output (204):
+    No Content
+    """
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_active = False
+    await db.commit()

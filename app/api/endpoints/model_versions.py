@@ -86,7 +86,16 @@ async def get_model_version(model_version_id: UUID, db: DBSession):
 
 @model_versions_router.patch("/{model_version_id}", response_model=ModelVersionRead)
 async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch, db: DBSession):
-    """Partially update a model version by UUID."""
+    """Partially update a model version by UUID.
+
+    Expected request:
+    PATCH /model-versions/{model_version_id}
+    {"version_tag": "2026-02-26"}
+
+    Expected output (200):
+    {"id": "<uuid>", "provider": "openai", "model_name": "gpt-4.1", "version_tag": "2026-02-26",
+    "created_at": "<iso-datetime>", "is_active": true}
+    """
     result = await db.execute(
         select(ModelVersion).where(
             ModelVersion.id == model_version_id,
@@ -107,3 +116,27 @@ async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch
     await db.commit()
     await db.refresh(model_version)
     return model_version
+
+
+@model_versions_router.delete("/{model_version_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_model_version(model_version_id: UUID, db: DBSession):
+    """Soft delete a model version by UUID.
+
+    Expected request:
+    DELETE /model-versions/{model_version_id}
+
+    Expected output (204):
+    No Content
+    """
+    result = await db.execute(
+        select(ModelVersion).where(
+            ModelVersion.id == model_version_id,
+            ModelVersion.is_active.is_(True),
+        )
+    )
+    model_version = result.scalar_one_or_none()
+    if model_version is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+
+    model_version.is_active = False
+    await db.commit()
