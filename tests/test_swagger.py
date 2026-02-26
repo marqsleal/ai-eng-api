@@ -1,7 +1,13 @@
 import httpx
+import pytest
 
 from app.core.settings import settings
 from app.main import app, app_factory
+
+
+@pytest.fixture(autouse=True)
+def disable_ollama_startup_check(monkeypatch):
+    monkeypatch.setattr(settings, "OLLAMA_STARTUP_CHECK_ENABLED", False)
 
 
 async def test_swagger_ui_is_available():

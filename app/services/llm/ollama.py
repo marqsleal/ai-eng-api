@@ -34,6 +34,18 @@ class OllamaGenerateResponse(BaseModel):
     total_duration: int | None = Field(default=None, ge=0)
 
 
+class OllamaModelTag(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1)
+
+
+class OllamaListModelsResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    models: list[OllamaModelTag] = Field(default_factory=list)
+
+
 class OllamaLLMClient:
     def __init__(self, base_url: str, timeout_seconds: float) -> None:
         self.base_url = base_url.rstrip("/")
@@ -101,3 +113,26 @@ class OllamaLLMClient:
             total_tokens=total_tokens,
             latency_ms=latency_ms,
         )
+
+    async def list_models(self) -> list[str]:
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                response = await client.get(f"{self.base_url}/api/tags")
+                response.raise_for_status()
+        except httpx.HTTPError as err:
+            raise LLMTransportError(
+                "Failed to call Ollama API",
+                provider="ollama",
+                retriable=True,
+            ) from err
+
+        try:
+            parsed_response = OllamaListModelsResponse.model_validate(response.json())
+        except (ValidationError, ValueError) as err:
+            raise LLMResponseValidationError(
+                "Invalid response from Ollama API",
+                provider="ollama",
+                retriable=False,
+            ) from err
+
+        return [model.name for model in parsed_response.models]

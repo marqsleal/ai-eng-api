@@ -10,6 +10,7 @@ from app.api.endpoints.users import users_router
 from app.core.logging import setup_logging
 from app.core.settings import settings
 from app.core.swagger import resolve_docs_config
+from app.services.llm.service import run_ollama_startup_checks
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Service")
+    await run_ollama_startup_checks()
 
     # Initialize:
     # app.state.vector_client = ...

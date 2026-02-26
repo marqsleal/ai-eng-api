@@ -2,10 +2,6 @@
 
 ## P0 - Critical Foundation
 
-### Runtime + Startup Reliability
-- [ ] Verify Ollama reachability on app startup.
-- [ ] Optionally verify `OLLAMA_DEFAULT_MODEL` exists; log actionable warning/error.
-
 ### API Contract Consistency
 - [ ] Define standard error schema: `code`, `message`, `details`.
 - [ ] Add global exception handlers to enforce consistent error payloads.

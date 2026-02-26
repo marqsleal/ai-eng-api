@@ -9,7 +9,7 @@ from app.services.llm.base import (
     LLMTransportError,
 )
 from app.services.llm.ollama import OllamaLLMClient
-from app.services.llm.service import generate_conversation_response
+from app.services.llm.service import generate_conversation_response, run_ollama_startup_checks
 
 
 class FakeHTTPResponse:
@@ -80,6 +80,41 @@ class FakeAsyncClientTransportError:
     async def post(self, _url: str, json: dict):
         request = httpx.Request("POST", "http://localhost:11434/api/generate")
         raise httpx.ConnectError("connection failed", request=request)
+
+
+class FakeAsyncClientListModelsSuccess:
+    def __init__(self, timeout: float) -> None:
+        self.timeout = timeout
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, _url: str):
+        return FakeHTTPResponse(
+            {
+                "models": [
+                    {"name": "llama3.2:3b"},
+                    {"name": "llama3.1:8b-instruct"},
+                ]
+            }
+        )
+
+
+class FakeAsyncClientListModelsInvalidResponse:
+    def __init__(self, timeout: float) -> None:
+        self.timeout = timeout
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, _url: str):
+        return FakeHTTPResponse({"models": [{"name": ""}]})
 
 
 async def test_ollama_generate_success(monkeypatch):
@@ -160,3 +195,50 @@ async def test_generate_conversation_response_ollama_delegates(monkeypatch):
 
     result = await generate_conversation_response(model_version=model_version, prompt="hello")
     assert result.response == "ok"
+
+
+async def test_ollama_list_models_success(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.llm.ollama.httpx.AsyncClient",
+        FakeAsyncClientListModelsSuccess,
+    )
+    client = OllamaLLMClient(base_url="http://localhost:11434", timeout_seconds=10.0)
+
+    models = await client.list_models()
+    assert models == ["llama3.2:3b", "llama3.1:8b-instruct"]
+
+
+async def test_ollama_list_models_invalid_response_raises_validation_error(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.llm.ollama.httpx.AsyncClient",
+        FakeAsyncClientListModelsInvalidResponse,
+    )
+    client = OllamaLLMClient(base_url="http://localhost:11434", timeout_seconds=10.0)
+
+    with pytest.raises(LLMResponseValidationError):
+        await client.list_models()
+
+
+async def test_run_ollama_startup_checks_reachability_failure_raises(monkeypatch):
+    async def fake_list_models(self):
+        raise LLMTransportError("down", provider="ollama", retriable=True)
+
+    monkeypatch.setattr("app.services.llm.ollama.OllamaLLMClient.list_models", fake_list_models)
+    monkeypatch.setattr("app.services.llm.service.settings.OLLAMA_STARTUP_CHECK_ENABLED", True)
+
+    with pytest.raises(RuntimeError) as err:
+        await run_ollama_startup_checks()
+    assert "could not reach Ollama" in str(err.value)
+
+
+async def test_run_ollama_startup_checks_strict_missing_default_model_raises(monkeypatch):
+    async def fake_list_models(self):
+        return ["another-model"]
+
+    monkeypatch.setattr("app.services.llm.ollama.OllamaLLMClient.list_models", fake_list_models)
+    monkeypatch.setattr("app.services.llm.service.settings.OLLAMA_STARTUP_CHECK_ENABLED", True)
+    monkeypatch.setattr("app.services.llm.service.settings.OLLAMA_DEFAULT_MODEL", "llama3.2:3b")
+
+    with pytest.raises(RuntimeError) as err:
+        await run_ollama_startup_checks()
+    assert "is not available" in str(err.value)
