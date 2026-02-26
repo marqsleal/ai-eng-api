@@ -26,7 +26,10 @@ async def create_user(payload: UserCreate, db: DBSession):
     """
     user_repository = UserRepository(db)
     try:
-        return await user_repository.create(payload.email)
+        user = await user_repository.create(payload.email)
+        await db.commit()
+        await db.refresh(user)
+        return user
     except IntegrityError as err:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Email already exists") from err
@@ -89,6 +92,8 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
 
     try:
         await user_repository.persist(user)
+        await db.commit()
+        await db.refresh(user)
     except IntegrityError as err:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Email already exists") from err
@@ -118,4 +123,4 @@ async def delete_user(user_id: UUID, db: DBSession):
     user.is_active = False
     for conversation in await conversation_repository.list_active_by_user_id(user_id):
         conversation.is_active = False
-    await conversation_repository.commit()
+    await db.commit()

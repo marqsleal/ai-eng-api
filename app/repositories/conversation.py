@@ -48,14 +48,9 @@ class ConversationRepository:
     async def create(self, payload: dict) -> Conversation:
         conversation = Conversation(**payload)
         self.session.add(conversation)
-        await self.session.commit()
-        await self.session.refresh(conversation)
+        await self.session.flush()
         return conversation
 
     async def persist(self, conversation: Conversation) -> Conversation:
-        await self.session.commit()
-        await self.session.refresh(conversation)
+        await self.session.flush()
         return conversation
-
-    async def commit(self) -> None:
-        await self.session.commit()

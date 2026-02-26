@@ -34,11 +34,14 @@ async def create_model_version(payload: ModelVersionCreate, db: DBSession):
     }
     """
     model_version_repository = ModelVersionRepository(db)
-    return await model_version_repository.create(
+    model_version = await model_version_repository.create(
         provider=payload.provider,
         model_name=payload.model_name,
         version_tag=payload.version_tag,
     )
+    await db.commit()
+    await db.refresh(model_version)
+    return model_version
 
 
 @model_versions_router.get("", response_model=list[ModelVersionRead])
@@ -97,6 +100,8 @@ async def patch_model_version(model_version_id: UUID, payload: ModelVersionPatch
         setattr(model_version, field, value)
 
     await model_version_repository.persist(model_version)
+    await db.commit()
+    await db.refresh(model_version)
     return model_version
 
 
@@ -119,9 +124,7 @@ async def delete_model_version(model_version_id: UUID, db: DBSession):
         raise HTTPException(status_code=404, detail="Model version not found")
 
     model_version.is_active = False
-    conversations = await conversation_repository.list_active_by_model_version_id(
-        model_version_id
-    )
+    conversations = await conversation_repository.list_active_by_model_version_id(model_version_id)
     for conversation in conversations:
         conversation.is_active = False
-    await conversation_repository.commit()
+    await db.commit()

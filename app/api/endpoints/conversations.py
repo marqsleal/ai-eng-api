@@ -41,7 +41,10 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
     if model_version is None:
         raise HTTPException(status_code=404, detail="Model version not found")
 
-    return await conversation_repository.create(payload.model_dump())
+    conversation = await conversation_repository.create(payload.model_dump())
+    await db.commit()
+    await db.refresh(conversation)
+    return conversation
 
 
 @conversations_router.get("", response_model=list[ConversationRead])
@@ -113,6 +116,8 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
         setattr(conversation, field, value)
 
     await conversation_repository.persist(conversation)
+    await db.commit()
+    await db.refresh(conversation)
     return conversation
 
 
@@ -132,4 +137,4 @@ async def delete_conversation(conversation_id: UUID, db: DBSession):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     conversation.is_active = False
-    await conversation_repository.commit()
+    await db.commit()

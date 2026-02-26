@@ -34,11 +34,9 @@ class ModelVersionRepository:
             version_tag=version_tag,
         )
         self.session.add(model_version)
-        await self.session.commit()
-        await self.session.refresh(model_version)
+        await self.session.flush()
         return model_version
 
     async def persist(self, model_version: ModelVersion) -> ModelVersion:
-        await self.session.commit()
-        await self.session.refresh(model_version)
+        await self.session.flush()
         return model_version

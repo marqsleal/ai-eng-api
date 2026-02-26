@@ -92,6 +92,9 @@ class FakeAsyncDB:
     async def rollback(self) -> None:
         self._pending.clear()
 
+    async def flush(self) -> None:
+        return None
+
     async def refresh(self, _obj: object) -> None:
         return None
 
