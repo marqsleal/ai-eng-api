@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 
     API_VI_PREFIX: str = Field(default="/api/v1")
     DEBUG: bool = Field(default=False)
+    OPENAPI_ENABLED: bool = Field(default=True)
+    OPENAPI_JSON_PATH: str = Field(default="/openapi.json")
+    SWAGGER_UI_ENABLED: bool = Field(default=True)
+    SWAGGER_UI_PATH: str = Field(default="/docs")
+    API_DESCRIPTION: str = Field(default="FastAPI backend for AI workflows.")
 
     REDIS_URL: str | None = None
     VECTOR_DB_URL: str | None = None

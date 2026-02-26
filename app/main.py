@@ -9,6 +9,7 @@ from app.api.endpoints.model_versions import model_versions_router
 from app.api.endpoints.users import users_router
 from app.core.logging import setup_logging
 from app.core.settings import settings
+from app.core.swagger import resolve_docs_config
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -32,7 +33,21 @@ async def lifespan(app: FastAPI):
 
 
 def app_factory() -> FastAPI:
-    app = FastAPI(title=settings.SERVICE_NAME, debug=settings.DEBUG, lifespan=lifespan)
+    docs_config = resolve_docs_config(settings)
+    app = FastAPI(
+        title=settings.SERVICE_NAME,
+        version=settings.VERSION,
+        description=settings.API_DESCRIPTION,
+        debug=settings.DEBUG,
+        lifespan=lifespan,
+        docs_url=docs_config.docs_url,
+        redoc_url=None,
+        openapi_url=docs_config.openapi_url,
+        swagger_ui_parameters={
+            "displayRequestDuration": True,
+            "defaultModelsExpandDepth": 1,
+        },
+    )
     app.include_router(health_router)
     app.include_router(users_router)
     app.include_router(model_versions_router)

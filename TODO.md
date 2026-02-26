@@ -41,11 +41,6 @@
 - [ ] Enforce max prompt length and blocked content checks.
 - [ ] Add optional output schema mode (structured response constraints).
 
-### API Documentation (Swagger)
-- [ ] Add Swagger/OpenAPI module integration.
-- [ ] Expose interactive docs endpoint (e.g. `/docs`) and raw OpenAPI JSON endpoint.
-- [ ] Ensure schemas/examples stay aligned with request/response models.
-
 ## P2 - Observability + Audit + Rollout
 
 ### Persistence + Traceability

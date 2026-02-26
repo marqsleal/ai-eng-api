@@ -76,6 +76,8 @@ make run_dev
 ```
 
 API: `http://localhost:8000`
+Swagger UI: `http://localhost:8000/docs`
+OpenAPI JSON: `http://localhost:8000/openapi.json`
 
 ## Local LLM (Ollama)
 
@@ -155,3 +157,5 @@ Important LLM/database vars:
 - `OLLAMA_BASE_URL`
 - `OLLAMA_DEFAULT_MODEL`
 - `OLLAMA_TIMEOUT_SECONDS`
+- `OPENAPI_ENABLED`, `OPENAPI_JSON_PATH`
+- `SWAGGER_UI_ENABLED`, `SWAGGER_UI_PATH`
