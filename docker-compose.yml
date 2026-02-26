@@ -26,6 +26,14 @@ services:
       - "4317:4317"
       - "4318:4318"
 
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
   api:
     build:
       context: .
@@ -46,3 +54,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

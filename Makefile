@@ -112,6 +112,17 @@ obs_down:
 	@docker compose stop jaeger
 
 
+.PHONY: llm_up
+llm_up:
+	@docker compose up -d ollama
+	@echo "Ollama API: http://localhost:11434"
+
+
+.PHONY: llm_down
+llm_down:
+	@docker compose stop ollama
+
+
 .PHONY: clean
 clean:
 	@echo "Cleaning Python cache files..."
