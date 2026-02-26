@@ -23,7 +23,6 @@ from app.api.endpoints.model_versions import (
 from app.api.endpoints.users import create_user, delete_user, get_user, patch_user
 from app.api.schemas.conversation import ConversationCreate, ConversationPatch
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch
-from app.api.schemas.query import ConversationsListQuery, ModelVersionsListQuery
 from app.api.schemas.user import UserCreate, UserPatch
 from app.models.conversation import Conversation
 from app.models.model_version import ModelVersion
@@ -160,7 +159,7 @@ async def test_create_and_list_model_versions(fake_db: FakeAsyncDB):
     assert model_version.id is not None
     assert model_version.provider == "openai"
 
-    listed = await list_model_versions(fake_db, ModelVersionsListQuery())
+    listed = await list_model_versions(fake_db)
     assert len(listed) == 1
 
     loaded = await get_model_version(model_version.id, fake_db)
@@ -187,7 +186,7 @@ async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB):
     assert conversation.id is not None
     assert conversation.prompt == "hello"
 
-    filtered = await list_conversations(fake_db, ConversationsListQuery(), user_id=user.id)
+    filtered = await list_conversations(fake_db, user_id=user.id)
     assert len(filtered) == 1
     assert filtered[0].id == conversation.id
 
@@ -365,7 +364,7 @@ async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB):
     assert user.is_active is False
     assert conversation.is_active is False
 
-    conversations = await list_conversations(fake_db, ConversationsListQuery(), user_id=user.id)
+    conversations = await list_conversations(fake_db, user_id=user.id)
     assert conversations == []
 
     with pytest.raises(HTTPException) as err:
@@ -395,7 +394,7 @@ async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB):
     assert model_version.is_active is False
     assert conversation.is_active is False
 
-    conversations = await list_conversations(fake_db, ConversationsListQuery(), user_id=user.id)
+    conversations = await list_conversations(fake_db, user_id=user.id)
     assert conversations == []
 
     with pytest.raises(HTTPException) as err:

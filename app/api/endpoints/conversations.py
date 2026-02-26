@@ -1,11 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.conversation import ConversationCreate, ConversationPatch, ConversationRead
-from app.api.schemas.query import ConversationsListQuery
+from app.api.schemas.query import ConversationsListQuery, ConversationsOrderBy
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
@@ -87,7 +87,9 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
 @conversations_router.get("", response_model=list[ConversationRead])
 async def list_conversations(
     db: DBSession,
-    query: Annotated[ConversationsListQuery, Depends(ConversationsListQuery)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    order_by: Annotated[ConversationsOrderBy, Query()] = ConversationsOrderBy.CREATED_AT_DESC,
     user_id: UUID | None = None,
 ):
     """List active conversations with optional user filter, pagination, and sorting.
@@ -100,6 +102,7 @@ async def list_conversations(
     Expected output (200):
     [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}]
     """
+    query = ConversationsListQuery(limit=limit, offset=offset, order_by=order_by)
     conversation_repository = ConversationRepository(db)
     return await conversation_repository.list_active(
         user_id=user_id,

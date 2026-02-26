@@ -1,11 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.query import UsersListQuery
+from app.api.schemas.query import UsersListQuery, UsersOrderBy
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
@@ -44,7 +44,9 @@ async def create_user(payload: UserCreate, db: DBSession):
 @users_router.get("", response_model=list[UserRead])
 async def list_users(
     db: DBSession,
-    query: Annotated[UsersListQuery, Depends(UsersListQuery)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    order_by: Annotated[UsersOrderBy, Query()] = UsersOrderBy.CREATED_AT_DESC,
 ):
     """List active users with typed pagination and sorting.
 
@@ -55,6 +57,7 @@ async def list_users(
     Expected output (200):
     [{"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}]
     """
+    query = UsersListQuery(limit=limit, offset=offset, order_by=order_by)
     user_repository = UserRepository(db)
     return await user_repository.list_active(
         limit=query.limit,
