@@ -30,6 +30,20 @@ async def test_openapi_json_is_available():
     assert "paths" in payload
 
 
+async def test_openapi_includes_standard_error_response_model():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(settings.OPENAPI_JSON_PATH)
+
+    payload = response.json()
+    users_path = payload["paths"]["/users/{user_id}"]["get"]
+    responses = users_path["responses"]
+    assert "404" in responses
+    assert responses["404"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/ErrorResponse"
+    )
+
+
 async def test_swagger_ui_is_disabled_when_openapi_is_disabled(monkeypatch):
     monkeypatch.setattr(settings, "SWAGGER_UI_ENABLED", True)
     monkeypatch.setattr(settings, "OPENAPI_ENABLED", False)

@@ -6,11 +6,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
+from app.core.errors import error_responses
 from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
 from app.repositories.user import UserRepository
 
-users_router = APIRouter(prefix="/users", tags=["users"])
+users_router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+    responses=error_responses(404, 409, 422, 500),
+)
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.conversation import ConversationCreate, ConversationPatch, ConversationRead
+from app.core.errors import error_responses
 from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
 from app.repositories.model_version import ModelVersionRepository
@@ -17,7 +18,11 @@ from app.services.llm.base import (
 )
 from app.services.llm.service import generate_conversation_response
 
-conversations_router = APIRouter(prefix="/conversations", tags=["conversations"])
+conversations_router = APIRouter(
+    prefix="/conversations",
+    tags=["conversations"],
+    responses=error_responses(400, 404, 422, 500, 503),
+)
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 

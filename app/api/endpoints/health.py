@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import error_responses
 from app.core.settings import Environment, settings
 from app.database.dependencies import get_db
 
 logger = logging.getLogger(__name__)
-health_router = APIRouter()
+health_router = APIRouter(responses=error_responses(503, 500))
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 

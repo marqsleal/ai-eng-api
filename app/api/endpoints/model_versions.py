@@ -5,11 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.model_version import ModelVersionCreate, ModelVersionPatch, ModelVersionRead
+from app.core.errors import error_responses
 from app.database.dependencies import get_db
 from app.repositories.conversation import ConversationRepository
 from app.repositories.model_version import ModelVersionRepository
 
-model_versions_router = APIRouter(prefix="/model-versions", tags=["model-versions"])
+model_versions_router = APIRouter(
+    prefix="/model-versions",
+    tags=["model-versions"],
+    responses=error_responses(404, 422, 500),
+)
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 

@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 
 class ErrorCode(Enum):
@@ -23,4 +22,4 @@ class ErrorResponse(BaseModel):
 
     code: ErrorCode
     message: str
-    details: dict[str, Any] | list[Any] | str | None = None
+    details: JsonValue | None = None
