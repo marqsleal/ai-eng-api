@@ -1,250 +1,794 @@
 # FastAPI Best Practices for AI Agents
 
-This document provides guidelines for AI agents working on FastAPI projects. Follow these conventions when writing or modifying code.
+FastAPI + Async SQLAlchemy + LLM Architecture Enforcement Guide
 
-## Project Structure
+This document defines mandatory architectural, implementation, and governance rules for AI agents (including Codex) contributing to this repository.
 
-Organize code by domain, not by file type.
+These rules are deterministic. Soft language such as “should” or “preferably” is intentionally avoided.
+
+---
+
+# Agent Approval Policy
+
+Codex MUST operate in an approval-first mode:
+
+- Do not implement changes without presenting a *plan*.
+- Always generate a *diff or change plan* first.
+- Await explicit confirmation before producing code changes.
+
+This mirrors CLI Suggest Mode behavior.
+
+---
+
+# 1. Architectural Principles
+
+## 1.1 Layered Architecture (Mandatory)
+
+The system follows strict layering:
 
 ```
-├── Dockerfile
-├── Makefile
-├── README.md
+Router (API Layer)
+    ↓
+Service (Business Logic)
+    ↓
+Repository (Persistence)
+    ↓
+SQLAlchemy Models (Data Layer)
+```
+
+Rules:
+
+* Routers MUST NOT contain business logic.
+* Services MUST NOT contain raw SQL.
+* Repositories MUST NOT commit transactions.
+* Models MUST NOT contain business logic.
+* LLM provider SDKs MUST NOT be instantiated outside `LLMClient`.
+
+---
+
+## 2. Project Structure
+
+The structure is domain-oriented and must be preserved.
+
+```
 ├── app/
-|   ├── api/           # The "View" / Presentation layer (FastAPI routers and endpoints)
-|   |   ├── endpoints/
-|   |   |   ├── items.py
-|   |   |   ├── users.py
-|   |   ├── schemas/   # Pydantic models for data validation and serialization
-|   ├── core/          # Core configurations and utilities
-|   ├── database/      # Database session management
-|   ├── models/        # The "Model" layer (SQLAlchemy models)
-|   ├── services/      # Business logic (can be considered part of the "Controller" logic)
-|   ├── main.py        # Entry point for the application, configures the server and routes
-├── pyproject.toml
-├── tests/             # Unit and integration tests
+│   ├── api/ or routers/
+│   ├── services/
+│   ├── repositories/
+│   ├── models/
+│   ├── schemas/
+│   ├── prompts/
+│   ├── llm/
+│   ├── core/
+│   ├── database/
+│   └── main.py
+├── migrations/
+├── tests/
 ```
 
-**Import Convention**: Use explicit module names when importing across domains:
-```python
-from src.auth import constants as auth_constants
-from src.notifications import service as notification_service
+Rules:
+
+* New features must follow this structure.
+* Cross-domain imports must use absolute imports.
+* No circular dependencies.
+
+---
+
+# 3. Async Rules
+
+## 3.1 Route Behavior
+
+* `async def` routes MUST use non-blocking I/O only.
+* Blocking libraries MUST be wrapped with `run_in_threadpool`.
+* CPU-intensive tasks MUST be offloaded (Celery or multiprocessing).
+* No `time.sleep()` inside async functions.
+
+## 3.2 Database
+
+* SQLAlchemy MUST use async engine.
+* All DB writes MUST explicitly call `commit()` in service layer.
+* Repositories MUST NOT call `commit()`.
+
+---
+
+# 4. LLM Integration Rules
+
+## 4.1 Provider Abstraction (Mandatory)
+
+All model calls MUST go through:
+
+```
+app.llm.client.LLMClient
 ```
 
-## Async Routes
+Forbidden:
 
-### Rules
-- `async def` routes: Use ONLY non-blocking I/O (`await` calls)
-- `def` routes (sync): Use for blocking I/O (runs in threadpool automatically)
-- CPU-intensive work: Offload to Celery or multiprocessing
+* Direct SDK usage (Ollama, OpenAI, etc.)
+* Inline HTTP calls to providers
 
-### Common Mistakes to Avoid
+---
+
+## 4.2 Generation Pattern
+
+Every generation MUST:
+
+* Capture latency
+* Capture input_tokens
+* Capture output_tokens
+* Persist model_version_id
+* Persist provider name
+* Persist prompt version
+* Enforce server-side parameter bounds
+
+Default parameters:
+
+* temperature: 0.2
+* top_p: 0.6
+* max_tokens: bounded by model version
+
+No uncontrolled free-form generation in regulated flows.
+
+---
+
+## 4.3 Prompt Governance
+
+* Prompts MUST live in `app/prompts/`
+* Every prompt MUST have a version constant
+* Prompt version MUST be stored with each conversation
+* Inline prompts in routers or services are forbidden
+* Prompts MUST be deterministic and static
+
+---
+
+# 5. Security and Compliance
+
+## 5.1 Forbidden Patterns
+
+* Hardcoded secrets
+* Logging API keys
+* Dynamic `eval`
+* Arbitrary code execution
+* Returning raw stack traces in production
+* Silent failure of provider errors
+
+## 5.2 Required Controls
+
+* Input validation via Pydantic
+* Server-side validation of generation parameters
+* Sanitization before LLM invocation
+* Role-based access enforcement when applicable
+
+---
+
+# 6. Observability
+
+## 6.1 Logging
+
+* Structured logging only
+* Include request_id
+* No secret exposure
+
+## 6.2 Telemetry
+
+All external calls MUST be wrapped in OpenTelemetry spans:
+
+* DB calls
+* LLM calls
+* External HTTP calls
+
+Spans MUST include:
+
+* provider
+* model
+* latency_ms
+
+No sensitive data in span attributes.
+
+---
+
+# 7. Database Conventions
+
+## 7.1 Naming
+
+* snake_case only
+* Singular table names
+* `_at` suffix for timestamps
+* `_date` suffix for date fields
+
+## 7.2 Index Naming Convention
+
+Explicit naming convention must be used for constraints and indexes.
+
+## 7.3 SQL Usage
+
+Complex joins and aggregations MAY be done in SQL.
+
+Business logic MUST NOT be implemented in SQL.
+
+---
+
+# 8. Migrations (Alembic)
+
+* Existing migrations MUST NOT be modified.
+* Every schema change requires a new migration.
+* Migration files must be reversible.
+* Model imports must be correctly configured in env.py.
+
+---
+
+# 9. Testing Requirements
+
+Every new feature MUST include:
+
+* Async test using AsyncClient
+* Success case
+* Failure case
+* Validation error case (if applicable)
+* LLM mock if generation involved
+
+---
+
+# 10. Templates
+
+The following templates are mandatory blueprints.
+
+---
+
+## Template — Router
+
 ```python
-# WRONG: Blocking call in async route
-@router.get("/bad")
-async def bad_route():
-    time.sleep(10)  # Blocks entire event loop
-    return {"status": "done"}
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.session import get_db
+from app.services.example_service import ExampleService
+from app.schemas.example import ExampleRequest, ExampleResponse
 
-# CORRECT: Non-blocking in async route
-@router.get("/good")
-async def good_route():
-    await asyncio.sleep(10)
-    return {"status": "done"}
+router = APIRouter(prefix="/examples", tags=["examples"])
 
-# CORRECT: Sync route for blocking operations
-@router.get("/also-good")
-def sync_route():
-    time.sleep(10)  # Runs in threadpool
-    return {"status": "done"}
+@router.post("/", response_model=ExampleResponse)
+async def create_example(
+    payload: ExampleRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    service = ExampleService(db)
+
+    try:
+        return await service.create(payload)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
 ```
 
-### Using Sync Libraries in Async Context
-```python
-from fastapi.concurrency import run_in_threadpool
+---
 
-@router.get("/")
-async def call_sync_library():
-    result = await run_in_threadpool(sync_client.make_request, data=my_data)
-    return result
+## Template — Service
+
+```python
+import time
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.example_repository import ExampleRepository
+
+class ExampleService:
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.repo = ExampleRepository(db)
+
+    async def create(self, payload):
+        start = time.perf_counter()
+
+        entity = await self.repo.create(payload)
+
+        await self.db.commit()
+        await self.db.refresh(entity)
+
+        latency_ms = int((time.perf_counter() - start) * 1000)
+
+        return {
+            "id": entity.id,
+            "latency_ms": latency_ms,
+        }
 ```
 
-## Pydantic
+---
 
-### Use Built-in Validators
+## Template — Repository
+
 ```python
-from pydantic import BaseModel, EmailStr, Field
+class ExampleRepository:
 
-class UserCreate(BaseModel):
-    username: str = Field(min_length=1, max_length=128, pattern="^[A-Za-z0-9-_]+$")
-    email: EmailStr
-    age: int = Field(ge=18)
+    def __init__(self, db):
+        self.db = db
+
+    async def create(self, payload):
+        entity = ExampleModel(**payload.model_dump())
+        self.db.add(entity)
+        return entity
 ```
 
-### Custom Base Model
-Create a shared base model for consistent serialization:
-```python
-from pydantic import BaseModel, ConfigDict
+---
 
-class CustomModel(BaseModel):
-    model_config = ConfigDict(
-        json_encoders={datetime: datetime_to_gmt_str},
-        populate_by_name=True,
+## Template — LLM Call
+
+```python
+import time
+from app.llm.client import LLMClient
+
+async def generate_response(model_version, user_prompt: str):
+    llm = LLMClient(provider=model_version.provider)
+
+    start = time.perf_counter()
+
+    response = await llm.generate(
+        model=model_version.model_name,
+        prompt=user_prompt,
+        temperature=0.2,
+        top_p=0.9,
+        max_tokens=512,
     )
+
+    latency_ms = int((time.perf_counter() - start) * 1000)
+
+    return {
+        "response": response.text,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
+        "latency_ms": latency_ms,
+    }
 ```
 
-### Split BaseSettings by Domain
+---
+
+## Template — Prompt Definition
+
 ```python
-# src/auth/config.py
-class AuthConfig(BaseSettings):
-    JWT_ALG: str
-    JWT_SECRET: str
-    JWT_EXP: int = 5
+SYSTEM_PROMPT_V1 = """
+You are a structured assistant.
+Do not fabricate information.
+If unsure, respond with uncertainty.
+"""
 
-auth_settings = AuthConfig()
+PROMPT_VERSION = "v1"
 ```
 
-## Dependencies
+---
 
-### Use for Validation, Not Just DI
+## Template — Telemetry Span
+
 ```python
-async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
-    post = await service.get_by_id(post_id)
-    if not post:
-        raise PostNotFound()
-    return post
+from opentelemetry import trace
 
-@router.get("/posts/{post_id}")
-async def get_post(post: dict[str, Any] = Depends(valid_post_id)):
-    return post
+tracer = trace.get_tracer(__name__)
+
+with tracer.start_as_current_span("llm.generate") as span:
+    span.set_attribute("llm.provider", provider)
+    span.set_attribute("llm.model", model_name)
 ```
 
-### Chain Dependencies
-```python
-async def valid_owned_post(
-    post: dict[str, Any] = Depends(valid_post_id),
-    token_data: dict[str, Any] = Depends(parse_jwt_data),
-) -> dict[str, Any]:
-    if post["creator_id"] != token_data["user_id"]:
-        raise UserNotOwner()
-    return post
+---
+
+# 11. Definition of Done
+
+A feature is complete only if:
+
+* Router implemented
+* Service implemented
+* Repository implemented
+* Schema implemented
+* Migration generated (if needed)
+* Telemetry added
+* Logging added
+* Tests added
+* Token accounting implemented (if LLM used)
+* Prompt version persisted (if LLM used)
+
+---
+
+# 12. Absolute Prohibitions
+
+* Business logic in routers
+* Direct provider SDK usage
+* Inline prompts
+* Hardcoded secrets
+* Blocking calls in async context
+* Missing token accounting
+* Missing latency tracking
+* Global mutable state
+
+---
+
+# 13. Project Workflow
+
+This project is educational and iterative.
+Formal sprint rituals are not required.
+
+However, every change MUST follow a clear and documented workflow to ensure architectural discipline and revision traceability.
+
+The objective is learning quality, not process overhead.
+
+---
+
+# 13.1 Before Starting Any Change
+
+Every new feature, refactor, or bug fix MUST start with a short written definition.
+
+Minimum required structure:
+
+```text
+### What is being built or fixed?
+Clear description of the problem or improvement.
+
+### Why?
+Learning objective or technical motivation.
+
+### Scope
+Which layers are affected?
+- Router
+- Service
+- Repository
+- Model
+- LLM
+- Prompt
+- Migration
+
+### Risks
+- Architecture impact
+- Performance impact
+- Token usage impact (if LLM-related)
 ```
 
-### Key Rules
-- Dependencies are cached per request (same dependency called multiple times = one execution)
-- Prefer `async` dependencies to avoid threadpool overhead
-- Use consistent path variable names to enable dependency reuse
+This can be written:
 
-## REST Conventions
+* In the GitHub Issue
+* Or in a short markdown file under `/docs/notes/`
 
-Use consistent path variable names for dependency reuse:
-```python
-# Both use profile_id, enabling shared valid_profile_id dependency
-GET /profiles/{profile_id}
-GET /creators/{profile_id}
+Development MUST NOT start without this definition.
+
+---
+
+# 13.2 Creating a Branch
+
+Every change MUST be done in a dedicated branch.
+
+## Branch Naming Convention
+
+```text
+feature/short-description
+bug/short-description
+refactor/short-description
+study/short-description
 ```
 
-## Database
+Examples:
 
-### Naming Conventions
-- Use `lower_case_snake` format
-- Singular table names: `post`, `user`, `post_like`
-- Group related tables with prefix: `payment_account`, `payment_bill`
-- DateTime suffix: `_at` (e.g., `created_at`)
-- Date suffix: `_date` (e.g., `birth_date`)
-
-### Set Explicit Index Names
-```python
-POSTGRES_INDEXES_NAMING_CONVENTION = {
-    "ix": "%(column_0_label)s_idx",
-    "uq": "%(table_name)s_%(column_0_name)s_key",
-    "ck": "%(table_name)s_%(constraint_name)s_check",
-    "fk": "%(table_name)s_%(column_0_name)s_fkey",
-    "pk": "%(table_name)s_pkey",
-}
+```text
+feature/add-conversation-token-tracking
+bug/fix-async-session-commit
+study/explore-structured-outputs
 ```
 
-### SQL-First Approach
-Prefer database-level operations for:
-- Complex joins
-- Data aggregation
-- Building nested JSON responses
+Rules:
 
-## Migrations (Alembic)
+* One logical change per branch.
+* Do not mix unrelated improvements.
+* Branch from main.
 
-- Keep migrations static and reversible
-- Use descriptive file names: `2022-08-24_post_content_idx.py`
-- Configure in alembic.ini:
-  ```ini
-  file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
-  ```
+---
 
-## API Documentation
+# 13.3 During Implementation
 
-### Hide Docs in Production
-```python
-SHOW_DOCS_ENVIRONMENT = ("local", "staging")
+While working on the issue:
 
-app_configs = {"title": "My API"}
-if ENVIRONMENT not in SHOW_DOCS_ENVIRONMENT:
-    app_configs["openapi_url"] = None
+You MUST ensure:
 
-app = FastAPI(**app_configs)
+* AGENTS.md rules are respected
+* Layer separation is preserved
+* LLM abstraction is not bypassed
+* Prompt versioning is maintained
+* Token accounting is preserved (if LLM involved)
+* Latency tracking is preserved (if LLM involved)
+* Tests are added or updated
+* Logging remains structured
+
+---
+
+# 13.4 Documenting the Solution
+
+Every branch MUST include documentation explaining what was done.
+
+This documentation can live in:
+
+* The Pull Request description (mandatory)
+* And optionally in `/docs/changes/<short-description>.md`
+
+Minimum documentation structure:
+
+```text
+### Problem
+What was missing or incorrect?
+
+### Root Cause (if bug)
+Why did it happen?
+
+### Solution
+What was implemented?
+
+### Architectural Impact
+Which layers were modified?
+
+### Observability Impact
+Were new spans or logs added?
+
+### LLM Impact (if applicable)
+- Model version changes?
+- Prompt version changes?
+- Token usage impact?
+- Latency impact?
 ```
 
-### Document Endpoints Properly
-```python
-@router.post(
-    "/endpoints",
-    response_model=DefaultResponseModel,
-    status_code=status.HTTP_201_CREATED,
-    description="Description of the endpoint",
-    tags=["Category"],
-    responses={
-        status.HTTP_201_CREATED: {"model": CreatedResponse},
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-    },
-)
+This ensures the repository becomes a structured knowledge base.
+
+---
+
+# 13.5 Creating the Pull Request
+
+## PR Title Format
+
+```text
+[type] Short description
 ```
 
-## Testing
+Examples:
 
-Use async test client from the start:
-```python
-import pytest
-from httpx import AsyncClient, ASGITransport
-
-@pytest.fixture
-async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
-    ) as client:
-        yield client
-
-@pytest.mark.asyncio
-async def test_endpoint(client: AsyncClient):
-    resp = await client.post("/posts")
-    assert resp.status_code == 201
+```text
+[feature] Add prompt version persistence
+[bug] Fix async commit ordering
+[study] Compare deterministic vs stochastic generation
 ```
 
-## Linting
+## PR Must Include
 
-Use ruff for formatting and linting:
-```shell
-ruff check --fix src
-ruff format src
+* Link to issue (if used)
+* Description using documentation template above
+* Testing explanation
+* Migration explanation (if applicable)
+
+---
+
+# 13.6 Review Checklist (Self-Review)
+
+Before merging your own PR, validate:
+
+* No business logic in routers
+* No direct LLM provider calls
+* No inline prompts
+* Explicit commit in service layer
+* No secrets exposed
+* No blocking calls in async context
+* Tests pass
+* Ruff passes
+* Code is readable and minimal
+
+If any item fails, fix before merge.
+
+---
+
+# 13.7 After Merge
+
+After merging to main:
+
+* Delete the branch
+* Re-read the PR once as a learning review
+* Identify potential refactor opportunities
+* Add follow-up issues if needed
+
+---
+
+# 13.8 Learning-Oriented Improvements
+
+This project is a learning system.
+
+Each major feature SHOULD aim to teach at least one of:
+
+* Better async patterns
+* Better SQL modeling
+* Better LLM governance
+* Better observability
+* Better error handling
+* Better architectural separation
+
+If a change does not improve understanding or architecture quality, reconsider its necessity.
+
+---
+
+# 13.9 Continuous Refinement
+
+AGENTS.md is a living document.
+
+If a mistake happens:
+
+1. Fix the code.
+2. Improve AGENTS.md to prevent repetition.
+3. Document the lesson learned.
+
+The goal is not rigid process.
+The goal is disciplined evolution and architectural maturity.
+
+---
+
+# 14. Architecture Decision Records (ADR)
+
+This project maintains lightweight Architecture Decision Records (ADRs) for decisions that affect:
+
+* System architecture
+* LLM integration strategy
+* Database modeling
+* Observability design
+* Security controls
+* Provider selection
+* Major refactors
+
+The goal is traceability and structured learning, not bureaucracy.
+
+An ADR MUST be created when a decision:
+
+* Changes architectural direction
+* Introduces a new external dependency
+* Modifies LLM behavior significantly
+* Affects token usage strategy
+* Impacts compliance or security posture
+* Alters data modeling patterns
+
+Minor refactors do not require ADRs.
+
+---
+
+# 14.1 ADR Storage Location
+
+ADRs MUST be stored in:
+
+```text
+/docs/adr/
 ```
 
-## Quick Reference
+Naming convention:
 
-| Scenario | Solution |
-|----------|----------|
-| Non-blocking I/O | `async def` route with `await` |
-| Blocking I/O | `def` route (sync) |
-| Sync library in async | `run_in_threadpool()` |
-| CPU-intensive | Celery/multiprocessing |
-| Request validation | Dependencies with DB checks |
-| Shared validation | Chain dependencies |
-| Config per domain | Separate `BaseSettings` classes |
-| Complex DB queries | SQL with JSON aggregation |
+```text
+ADR-0001-short-title.md
+ADR-0002-llm-provider-abstraction.md
+ADR-0003-prompt-versioning-strategy.md
+```
+
+Numbering MUST be sequential and never reused.
+
+---
+
+# 14.2 ADR Status Lifecycle
+
+Each ADR MUST include a status:
+
+* Proposed
+* Accepted
+* Rejected
+* Superseded (reference replacement ADR)
+* Deprecated
+
+Once Accepted, the decision becomes binding unless replaced.
+
+---
+
+# 14.3 Lightweight ADR Template
+
+Each ADR MUST follow this structure:
+
+```text
+# ADR-XXXX: Short Title
+
+## Status
+Proposed | Accepted | Rejected | Superseded | Deprecated
+
+## Context
+What is the technical problem?
+What constraints exist?
+Why is a decision needed?
+
+Include:
+- Architectural background
+- LLM implications (if any)
+- Data implications (if any)
+- Observability implications (if any)
+
+## Decision
+What is being decided?
+
+Be explicit and deterministic.
+Avoid vague wording.
+
+## Consequences
+
+### Positive
+Benefits of this decision.
+
+### Negative
+Trade-offs, limitations, technical debt introduced.
+
+### Operational Impact
+- Migration required?
+- Token cost impact?
+- Latency impact?
+- Security implications?
+
+## Alternatives Considered
+Briefly describe alternatives and why they were rejected.
+
+## Future Revisit Criteria
+Under what conditions should this ADR be reconsidered?
+```
+
+---
+
+# 14.4 LLM-Specific ADR Requirements
+
+If the ADR involves LLM behavior, it MUST additionally include:
+
+* Model versioning implications
+* Prompt versioning implications
+* Token cost estimation impact
+* Determinism vs stochastic trade-off
+* Hallucination risk considerations
+* Observability requirements (metrics/spans)
+
+---
+
+# 14.5 When to Write an ADR in This Project
+
+Examples:
+
+* Switching from Ollama to a multi-provider abstraction
+* Introducing RAG
+* Changing chunking strategy
+* Moving from inline prompt composition to template engine
+* Adding caching to LLM responses
+* Introducing rate limiting
+* Changing DB transaction pattern
+* Introducing background job processing
+
+Do not create ADRs for:
+
+* Small refactors
+* Naming changes
+* Minor performance optimizations
+
+---
+
+# 14.6 ADR and Pull Request Integration
+
+If an ADR is created:
+
+* The PR MUST reference the ADR
+* The ADR status MUST be set to Proposed during PR
+* The ADR MUST be marked Accepted upon merge
+* If rejected, mark it Rejected and explain why
+
+---
+
+# 14.7 Educational Reflection (Optional but Recommended)
+
+Since this is a study project, you MAY add:
+
+```text
+## Learning Notes
+What architectural insight did this decision reinforce?
+What would be done differently in production?
+```
+
+This section is optional but encouraged for deeper understanding.
+
+---
+
+This document is binding.
+AI agents must follow it without deviation.
+
+
