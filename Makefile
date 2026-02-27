@@ -165,17 +165,16 @@ llm_restart:
 .PHONY: stack_up
 stack_up:
 	@$(COMPOSE) up --build --detach
-	@echo "Full stack running; use `make logs_stack` to follow every service."
 
 
 .PHONY: stack_stop
 stack_stop:
-	@$(COMPOSE) stop api postgres jaeger ollama ollama-init
+	@$(COMPOSE) stop api postgres ollama ollama-init
 
 
 .PHONY: stack_restart
 stack_restart:
-	@$(COMPOSE) restart api postgres jaeger ollama ollama-init
+	@$(COMPOSE) restart api postgres ollama ollama-init
 
 
 .PHONY: stack_down
