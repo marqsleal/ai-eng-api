@@ -34,7 +34,6 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
       "user_id": "<uuid>",
       "model_version_id": "<uuid>",
       "prompt": "hello",
-      "response": "world (optional, generated when omitted)",
       "temperature": 0.2
     }
 

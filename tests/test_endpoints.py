@@ -133,6 +133,16 @@ def fake_db():
     return FakeAsyncDB()
 
 
+async def fake_generate_conversation_response(**_kwargs):
+    return LLMGenerationResult(
+        response="generated response",
+        input_tokens=10,
+        output_tokens=5,
+        total_tokens=15,
+        latency_ms=50,
+    )
+
+
 async def test_create_user_and_get_user(fake_db: FakeAsyncDB):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     assert user.email == "ana@example.com"
@@ -166,11 +176,15 @@ async def test_create_and_list_model_versions(fake_db: FakeAsyncDB):
     assert loaded.id == model_version.id
 
 
-async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB):
+async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB, monkeypatch):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
         fake_db,
+    )
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_conversation_response,
     )
 
     conversation = await create_conversation(
@@ -178,7 +192,6 @@ async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB):
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="hello",
-            response="world",
             temperature=0.1,
         ),
         fake_db,
@@ -191,7 +204,7 @@ async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB):
     assert filtered[0].id == conversation.id
 
     loaded = await get_conversation(conversation.id, fake_db)
-    assert loaded.response == "world"
+    assert loaded.response == "generated response"
 
 
 async def test_create_conversation_missing_user_returns_404(fake_db: FakeAsyncDB):
@@ -206,7 +219,6 @@ async def test_create_conversation_missing_user_returns_404(fake_db: FakeAsyncDB
                 user_id=uuid4(),
                 model_version_id=model_version.id,
                 prompt="hello",
-                response="world",
             ),
             fake_db,
         )
@@ -246,7 +258,6 @@ async def test_create_conversation_generates_response_when_missing(
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="hello",
-            response=None,
         ),
         fake_db,
     )
@@ -273,7 +284,6 @@ async def test_create_conversation_missing_response_unsupported_provider_returns
                 user_id=user.id,
                 model_version_id=model_version.id,
                 prompt="hello",
-                response=None,
             ),
             fake_db,
         )
@@ -309,18 +319,21 @@ async def test_patch_model_version_updates_version_tag(fake_db: FakeAsyncDB):
     assert updated.version_tag == "2026-02-26"
 
 
-async def test_patch_conversation_updates_prompt_and_temperature(fake_db: FakeAsyncDB):
+async def test_patch_conversation_updates_prompt_and_temperature(fake_db: FakeAsyncDB, monkeypatch):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
         fake_db,
+    )
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_conversation_response,
     )
     conversation = await create_conversation(
         ConversationCreate(
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="old",
-            response="world",
             temperature=0.1,
         ),
         fake_db,
@@ -343,18 +356,21 @@ async def test_patch_missing_user_returns_404(fake_db: FakeAsyncDB):
     assert err.value.detail == "User not found"
 
 
-async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB):
+async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB, monkeypatch):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
         fake_db,
+    )
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_conversation_response,
     )
     conversation = await create_conversation(
         ConversationCreate(
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="hello",
-            response="world",
         ),
         fake_db,
     )
@@ -373,18 +389,21 @@ async def test_delete_user_soft_deletes(fake_db: FakeAsyncDB):
     assert err.value.detail == "Conversation not found"
 
 
-async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB):
+async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB, monkeypatch):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
         fake_db,
+    )
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_conversation_response,
     )
     conversation = await create_conversation(
         ConversationCreate(
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="hello",
-            response="world",
         ),
         fake_db,
     )
@@ -403,18 +422,21 @@ async def test_delete_model_version_soft_deletes(fake_db: FakeAsyncDB):
     assert err.value.detail == "Conversation not found"
 
 
-async def test_delete_conversation_soft_deletes(fake_db: FakeAsyncDB):
+async def test_delete_conversation_soft_deletes(fake_db: FakeAsyncDB, monkeypatch):
     user = await create_user(UserCreate(email="ana@example.com"), fake_db)
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
         fake_db,
+    )
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_conversation_response,
     )
     conversation = await create_conversation(
         ConversationCreate(
             user_id=user.id,
             model_version_id=model_version.id,
             prompt="hello",
-            response="world",
         ),
         fake_db,
     )

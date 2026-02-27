@@ -59,28 +59,26 @@ class ConversationService:
             raise ConversationModelVersionNotFoundError("Model version not found")
 
         conversation_data = payload.model_dump()
-        should_generate_response = payload.response is None or payload.response.strip() == ""
-        if should_generate_response:
-            try:
-                llm_response = await generate_conversation_response(
-                    model_version=model_version,
-                    prompt=payload.prompt,
-                    temperature=payload.temperature,
-                    top_p=payload.top_p,
-                    max_tokens=payload.max_tokens,
-                )
-            except LLMProviderNotSupportedError as err:
-                raise ConversationProviderNotSupportedError(str(err)) from err
-            except (LLMTransportError, LLMResponseValidationError) as err:
-                raise ConversationProviderUnavailableError("LLM provider unavailable") from err
-            except LLMError as err:
-                raise ConversationProviderUnavailableError(str(err)) from err
+        try:
+            llm_response = await generate_conversation_response(
+                model_version=model_version,
+                prompt=payload.prompt,
+                temperature=payload.temperature,
+                top_p=payload.top_p,
+                max_tokens=payload.max_tokens,
+            )
+        except LLMProviderNotSupportedError as err:
+            raise ConversationProviderNotSupportedError(str(err)) from err
+        except (LLMTransportError, LLMResponseValidationError) as err:
+            raise ConversationProviderUnavailableError("LLM provider unavailable") from err
+        except LLMError as err:
+            raise ConversationProviderUnavailableError(str(err)) from err
 
-            conversation_data["response"] = llm_response.response
-            conversation_data["input_tokens"] = llm_response.input_tokens
-            conversation_data["output_tokens"] = llm_response.output_tokens
-            conversation_data["total_tokens"] = llm_response.total_tokens
-            conversation_data["latency_ms"] = llm_response.latency_ms
+        conversation_data["response"] = llm_response.response
+        conversation_data["input_tokens"] = llm_response.input_tokens
+        conversation_data["output_tokens"] = llm_response.output_tokens
+        conversation_data["total_tokens"] = llm_response.total_tokens
+        conversation_data["latency_ms"] = llm_response.latency_ms
 
         conversation = await self.conversation_repository.create(conversation_data)
         await self.session.commit()

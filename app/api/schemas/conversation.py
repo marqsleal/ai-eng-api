@@ -17,14 +17,9 @@ class ConversationCreate(BaseModel):
     user_id: UUID
     model_version_id: UUID
     prompt: PromptString
-    response: ResponseString | None = None
     temperature: TemperatureFloat | None = None
     top_p: TopPFloat | None = None
     max_tokens: MaxTokensInt | None = None
-    input_tokens: PositiveInt | None = None
-    output_tokens: PositiveInt | None = None
-    total_tokens: PositiveInt | None = None
-    latency_ms: PositiveInt | None = None
 
 
 class ConversationPatch(BaseModel):

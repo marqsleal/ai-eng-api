@@ -45,22 +45,7 @@ Use the JSON payloads below in Swagger UI (`Try it out`).
 }
 ```
 
-## 3) Create Conversation (Manual)
-
-- Method/Path: `POST /conversations`
-- Request body:
-
-```json
-{
-  "user_id": "<USER_ID>",
-  "model_version_id": "<MODEL_VERSION_ID>",
-  "prompt": "hello",
-  "response": "world",
-  "temperature": 0.2
-}
-```
-
-## 4) Create Conversation (LLM Auto-generation)
+## 3) Create Conversation (LLM Auto-generation)
 
 Requirements:
 - `model_version.provider` must be `ollama`
@@ -79,14 +64,14 @@ Requirements:
 }
 ```
 
-## 5) Common Reads
+## 4) Common Reads
 
 - `GET /users`
 - `GET /model-versions`
 - `GET /conversations`
 - `GET /conversations?user_id=<USER_ID>`
 
-## 6) Update + Delete Examples
+## 5) Update + Delete Examples
 
 ### Update User
 
@@ -104,7 +89,7 @@ Requirements:
 - Method/Path: `DELETE /users/{user_id}`
 - Request body: none
 
-## 7) Negative Case
+## 6) Negative Case
 
 - Method/Path: `POST /conversations`
 - Request body:
@@ -113,8 +98,7 @@ Requirements:
 {
   "user_id": "11111111-1111-1111-1111-111111111111",
   "model_version_id": "<MODEL_VERSION_ID>",
-  "prompt": "x",
-  "response": "y"
+  "prompt": "x"
 }
 ```
 
