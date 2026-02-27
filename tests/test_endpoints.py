@@ -237,7 +237,7 @@ async def test_create_conversation_generates_response_when_missing(
         )
 
     monkeypatch.setattr(
-        "app.api.endpoints.conversations.generate_conversation_response",
+        "app.services.conversation.generate_conversation_response",
         fake_generate_conversation_response,
     )
 

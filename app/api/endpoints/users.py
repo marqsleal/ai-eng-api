@@ -2,15 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.query import UsersListQuery, UsersOrderBy
 from app.api.schemas.user import UserCreate, UserPatch, UserRead
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
-from app.repositories.conversation import ConversationRepository
-from app.repositories.user import UserRepository
+from app.services.user import UserConflictError, UserNotFoundError, UserService
 
 users_router = APIRouter(
     prefix="/users",
@@ -30,15 +28,11 @@ async def create_user(payload: UserCreate, db: DBSession):
     Expected output (201):
     {"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}
     """
-    user_repository = UserRepository(db)
+    service = UserService(db)
     try:
-        user = await user_repository.create(payload.email)
-        await db.commit()
-        await db.refresh(user)
-        return user
-    except IntegrityError as err:
-        await db.rollback()
-        raise HTTPException(status_code=409, detail="Email already exists") from err
+        return await service.create(payload.email)
+    except UserConflictError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
 
 
 @users_router.get("", response_model=list[UserRead])
@@ -58,8 +52,8 @@ async def list_users(
     [{"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}]
     """
     query = UsersListQuery(limit=limit, offset=offset, order_by=order_by)
-    user_repository = UserRepository(db)
-    return await user_repository.list_active(
+    service = UserService(db)
+    return await service.list(
         limit=query.limit,
         offset=query.offset,
         order_by=query.order_by.value,
@@ -76,11 +70,11 @@ async def get_user(user_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "email": "ana@example.com", "created_at": "<iso-datetime>"}
     """
-    user_repository = UserRepository(db)
-    user = await user_repository.get_active_by_id(user_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+    service = UserService(db)
+    try:
+        return await service.get(user_id)
+    except UserNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
 
 
 @users_router.patch("/{user_id}", response_model=UserRead)
@@ -95,27 +89,13 @@ async def patch_user(user_id: UUID, payload: UserPatch, db: DBSession):
     {"id": "<uuid>", "email": "bea@example.com", "created_at": "<iso-datetime>",
     "is_active": true}
     """
-    user_repository = UserRepository(db)
-    user = await user_repository.get_active_by_id(user_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        return user
-
-    for field, value in updates.items():
-        setattr(user, field, value)
-
+    service = UserService(db)
     try:
-        await user_repository.persist(user)
-        await db.commit()
-        await db.refresh(user)
-    except IntegrityError as err:
-        await db.rollback()
-        raise HTTPException(status_code=409, detail="Email already exists") from err
-
-    return user
+        return await service.patch(user_id, payload)
+    except UserNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    except UserConflictError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
 
 
 @users_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -130,14 +110,8 @@ async def delete_user(user_id: UUID, db: DBSession):
     Expected output (204):
     No Content
     """
-    user_repository = UserRepository(db)
-    conversation_repository = ConversationRepository(db)
-
-    user = await user_repository.get_active_by_id(user_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user.is_active = False
-    for conversation in await conversation_repository.list_active_by_user_id(user_id):
-        conversation.is_active = False
-    await db.commit()
+    service = UserService(db)
+    try:
+        await service.delete(user_id)
+    except UserNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err

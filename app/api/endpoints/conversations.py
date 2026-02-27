@@ -8,16 +8,14 @@ from app.api.schemas.conversation import ConversationCreate, ConversationPatch, 
 from app.api.schemas.query import ConversationsListQuery, ConversationsOrderBy
 from app.core.errors import error_responses
 from app.database.dependencies import get_db
-from app.repositories.conversation import ConversationRepository
-from app.repositories.model_version import ModelVersionRepository
-from app.repositories.user import UserRepository
-from app.services.llm.base import (
-    LLMError,
-    LLMProviderNotSupportedError,
-    LLMResponseValidationError,
-    LLMTransportError,
+from app.services.conversation import (
+    ConversationModelVersionNotFoundError,
+    ConversationNotFoundError,
+    ConversationProviderNotSupportedError,
+    ConversationProviderUnavailableError,
+    ConversationService,
+    ConversationUserNotFoundError,
 )
-from app.services.llm.service import generate_conversation_response
 
 conversations_router = APIRouter(
     prefix="/conversations",
@@ -43,45 +41,15 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
     Expected output (201):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    user_repository = UserRepository(db)
-    model_version_repository = ModelVersionRepository(db)
-    conversation_repository = ConversationRepository(db)
-
-    user = await user_repository.get_active_by_id(payload.user_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    model_version = await model_version_repository.get_active_by_id(payload.model_version_id)
-    if model_version is None:
-        raise HTTPException(status_code=404, detail="Model version not found")
-
-    conversation_data = payload.model_dump()
-    should_generate_response = payload.response is None or payload.response.strip() == ""
-    if should_generate_response:
-        try:
-            llm_response = await generate_conversation_response(
-                model_version=model_version,
-                prompt=payload.prompt,
-                temperature=payload.temperature,
-                top_p=payload.top_p,
-                max_tokens=payload.max_tokens,
-            )
-        except LLMProviderNotSupportedError as err:
-            raise HTTPException(status_code=400, detail=str(err)) from err
-        except (LLMTransportError, LLMResponseValidationError) as err:
-            raise HTTPException(status_code=503, detail="LLM provider unavailable") from err
-        except LLMError as err:
-            raise HTTPException(status_code=503, detail=str(err)) from err
-
-        conversation_data["response"] = llm_response.response
-        conversation_data["input_tokens"] = llm_response.input_tokens
-        conversation_data["output_tokens"] = llm_response.output_tokens
-        conversation_data["total_tokens"] = llm_response.total_tokens
-        conversation_data["latency_ms"] = llm_response.latency_ms
-
-    conversation = await conversation_repository.create(conversation_data)
-    await db.commit()
-    await db.refresh(conversation)
-    return conversation
+    service = ConversationService(db)
+    try:
+        return await service.create(payload)
+    except (ConversationUserNotFoundError, ConversationModelVersionNotFoundError) as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    except ConversationProviderNotSupportedError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    except ConversationProviderUnavailableError as err:
+        raise HTTPException(status_code=503, detail=str(err)) from err
 
 
 @conversations_router.get("", response_model=list[ConversationRead])
@@ -103,8 +71,8 @@ async def list_conversations(
     [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}]
     """
     query = ConversationsListQuery(limit=limit, offset=offset, order_by=order_by)
-    conversation_repository = ConversationRepository(db)
-    return await conversation_repository.list_active(
+    service = ConversationService(db)
+    return await service.list(
         user_id=user_id,
         limit=query.limit,
         offset=query.offset,
@@ -122,11 +90,11 @@ async def get_conversation(conversation_id: UUID, db: DBSession):
     Expected output (200):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
     """
-    conversation_repository = ConversationRepository(db)
-    conversation = await conversation_repository.get_active_by_id(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return conversation
+    service = ConversationService(db)
+    try:
+        return await service.get(conversation_id)
+    except ConversationNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
 
 
 @conversations_router.patch("/{conversation_id}", response_model=ConversationRead)
@@ -141,34 +109,15 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "new prompt",
     "response": "world", "temperature": 0.3, "created_at": "<iso-datetime>", "is_active": true}
     """
-    conversation_repository = ConversationRepository(db)
-    user_repository = UserRepository(db)
-    model_version_repository = ModelVersionRepository(db)
-    conversation = await conversation_repository.get_active_by_id(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        return conversation
-
-    if "user_id" in updates:
-        user = await user_repository.get_active_by_id(updates["user_id"])
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-
-    if "model_version_id" in updates:
-        model_version = await model_version_repository.get_active_by_id(updates["model_version_id"])
-        if model_version is None:
-            raise HTTPException(status_code=404, detail="Model version not found")
-
-    for field, value in updates.items():
-        setattr(conversation, field, value)
-
-    await conversation_repository.persist(conversation)
-    await db.commit()
-    await db.refresh(conversation)
-    return conversation
+    service = ConversationService(db)
+    try:
+        return await service.patch(conversation_id, payload)
+    except (
+        ConversationNotFoundError,
+        ConversationUserNotFoundError,
+        ConversationModelVersionNotFoundError,
+    ) as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
 
 
 @conversations_router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -181,10 +130,8 @@ async def delete_conversation(conversation_id: UUID, db: DBSession):
     Expected output (204):
     No Content
     """
-    conversation_repository = ConversationRepository(db)
-    conversation = await conversation_repository.get_active_by_id(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    conversation.is_active = False
-    await db.commit()
+    service = ConversationService(db)
+    try:
+        await service.delete(conversation_id)
+    except ConversationNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err

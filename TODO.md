@@ -1,11 +1,5 @@
 # Todo Roadmap
 
-## P0 - Critical Foundation
-
-### Architecture Boundaries
-- [ ] Move endpoint orchestration into service layer.
-- [ ] Keep endpoint functions as pure HTTP adapters.
-
 ## P1 - Product Features + Safety
 
 ### Prompting v1 (Opt-in)
