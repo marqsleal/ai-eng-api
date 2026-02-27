@@ -7,8 +7,21 @@
 - [ ] Implement prompt merge order:
   base system prompt -> model-specific prompt -> request custom instruction -> user prompt.
 - [ ] Extend `ConversationCreate` with optional fields:
-  `system_instruction`, `profile_id`, `context`.
+  `system_instruction`, `context`.
 - [ ] Keep backward compatibility.
+- [ ] Segment RAG workflow inputs into **System Prompt** and **General Instructions**.
+
+#### Prompting v1 Workflow
+1. Receive `POST /conversations` with optional `system_instruction` and `context`.
+2. Segment RAG workflow inputs into:
+   System Prompt: high-priority safety, role, and behavior rules.
+   General Instructions: task-level guidance, style, and optional RAG-specific directions.
+3. Load system prompt and general instructions from `app/prompts/`.
+4. Build final prompt using merge order:
+   system prompt -> request custom instruction -> general instructions -> user prompt.
+5. If `context` is provided, merge or append it according to policy (documented in service logic).
+6. Send final prompt to the LLM provider.
+7. Persist conversation with original inputs and generated response (plus metadata once P2 lands).
 
 ### Prompt Enrichment + Profiles
 - [ ] Add enrichment service before LLM call:

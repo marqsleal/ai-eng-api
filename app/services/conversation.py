@@ -14,6 +14,7 @@ from app.services.llm.base import (
     LLMTransportError,
 )
 from app.services.llm.service import generate_conversation_response
+from app.services.prompting import build_final_prompt
 
 
 class ConversationServiceError(Exception):
@@ -58,11 +59,16 @@ class ConversationService:
         if model_version is None:
             raise ConversationModelVersionNotFoundError("Model version not found")
 
-        conversation_data = payload.model_dump()
+        conversation_data = payload.model_dump(exclude={"system_instruction", "context"})
+        final_prompt = build_final_prompt(
+            user_prompt=payload.prompt,
+            system_instruction=payload.system_instruction,
+            context=payload.context,
+        )
         try:
             llm_response = await generate_conversation_response(
                 model_version=model_version,
-                prompt=payload.prompt,
+                prompt=final_prompt,
                 temperature=payload.temperature,
                 top_p=payload.top_p,
                 max_tokens=payload.max_tokens,

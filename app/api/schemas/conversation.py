@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 PromptString = Annotated[str, Field(min_length=1)]
 ResponseString = Annotated[str, Field(min_length=1)]
+SystemInstructionString = Annotated[str, Field(min_length=1)]
+ContextString = Annotated[str, Field(min_length=1)]
 TemperatureFloat = Annotated[float, Field(ge=0.0, le=2.0)]
 TopPFloat = Annotated[float, Field(ge=0.0, le=1.0)]
 PositiveInt = Annotated[int, Field(ge=0)]
@@ -17,6 +19,8 @@ class ConversationCreate(BaseModel):
     user_id: UUID
     model_version_id: UUID
     prompt: PromptString
+    system_instruction: SystemInstructionString | None = None
+    context: ContextString | None = None
     temperature: TemperatureFloat | None = None
     top_p: TopPFloat | None = None
     max_tokens: MaxTokensInt | None = None

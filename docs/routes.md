@@ -59,8 +59,24 @@ Requirements:
   "user_id": "<USER_ID>",
   "model_version_id": "<MODEL_VERSION_ID>",
   "prompt": "Reply exactly: LOCAL_OK",
+  "system_instruction": "You are a helpful assistant.",
+  "context": "Use the retrieved facts only.",
   "temperature": 0,
   "max_tokens": 16
+}
+```
+
+- Expected response:
+
+```json
+{
+  "id": "<CONVERSATION_ID>",
+  "user_id": "<USER_ID>",
+  "model_version_id": "<MODEL_VERSION_ID>",
+  "prompt": "Reply exactly: LOCAL_OK",
+  "response": "<generated>",
+  "created_at": "<iso-datetime>",
+  "is_active": true
 }
 ```
 

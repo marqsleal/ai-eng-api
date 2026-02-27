@@ -34,11 +34,15 @@ async def create_conversation(payload: ConversationCreate, db: DBSession):
       "user_id": "<uuid>",
       "model_version_id": "<uuid>",
       "prompt": "hello",
+      "system_instruction": "You are a helpful assistant.",
+      "context": "Use the retrieved facts only.",
       "temperature": 0.2
     }
 
     Expected output (201):
-    {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
+    {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>",
+    "prompt": "hello", "response": "<generated>", "created_at": "<iso-datetime>",
+    "is_active": true}
     """
     service = ConversationService(db)
     try:
@@ -67,7 +71,9 @@ async def list_conversations(
     GET /conversations?limit=20&offset=0&order_by=created_at_desc
 
     Expected output (200):
-    [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}]
+    [{"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>",
+    "prompt": "hello", "response": "<generated>", "created_at": "<iso-datetime>",
+    "is_active": true}]
     """
     query = ConversationsListQuery(limit=limit, offset=offset, order_by=order_by)
     service = ConversationService(db)
@@ -87,7 +93,9 @@ async def get_conversation(conversation_id: UUID, db: DBSession):
     GET /conversations/{conversation_id}
 
     Expected output (200):
-    {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "hello"}
+    {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>",
+    "prompt": "hello", "response": "<generated>", "created_at": "<iso-datetime>",
+    "is_active": true}
     """
     service = ConversationService(db)
     try:
@@ -106,7 +114,8 @@ async def patch_conversation(conversation_id: UUID, payload: ConversationPatch, 
 
     Expected output (200):
     {"id": "<uuid>", "user_id": "<uuid>", "model_version_id": "<uuid>", "prompt": "new prompt",
-    "response": "world", "temperature": 0.3, "created_at": "<iso-datetime>", "is_active": true}
+    "response": "<generated>", "temperature": 0.3, "created_at": "<iso-datetime>",
+    "is_active": true}
     """
     service = ConversationService(db)
     try:

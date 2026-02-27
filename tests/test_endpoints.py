@@ -207,6 +207,55 @@ async def test_create_conversation_and_filter_by_user(fake_db: FakeAsyncDB, monk
     assert loaded.response == "generated response"
 
 
+async def test_create_conversation_merges_prompt_segments(fake_db: FakeAsyncDB, monkeypatch):
+    user = await create_user(UserCreate(email="ana@example.com"), fake_db)
+    model_version = await create_model_version(
+        ModelVersionCreate(
+            provider="ollama",
+            model_name="llama3.1:8b-instruct",
+            version_tag="v1",
+        ),
+        fake_db,
+    )
+
+    def fake_read_prompt_file(path):
+        if path.name == "system_prompt.md":
+            return "BASE"
+        if path.name == "general_instructions.md":
+            return "GENERAL"
+        return ""
+
+    async def fake_generate_with_prompt(**kwargs):
+        assert kwargs["prompt"] == "BASE\n\nCUSTOM\n\nGENERAL\n\nContext:\nCONTEXT\n\nhello"
+        return LLMGenerationResult(
+            response="generated response",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            latency_ms=50,
+        )
+
+    monkeypatch.setattr("app.services.prompting._read_prompt_file", fake_read_prompt_file)
+    monkeypatch.setattr(
+        "app.services.conversation.generate_conversation_response",
+        fake_generate_with_prompt,
+    )
+
+    conversation = await create_conversation(
+        ConversationCreate(
+            user_id=user.id,
+            model_version_id=model_version.id,
+            prompt="hello",
+            system_instruction="CUSTOM",
+            context="CONTEXT",
+        ),
+        fake_db,
+    )
+
+    assert conversation.prompt == "hello"
+    assert conversation.response == "generated response"
+
+
 async def test_create_conversation_missing_user_returns_404(fake_db: FakeAsyncDB):
     model_version = await create_model_version(
         ModelVersionCreate(provider="openai", model_name="gpt-4.1", version_tag="2026-02-25"),
