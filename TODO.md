@@ -1,5 +1,44 @@
 # Todo Roadmap
 
+## P0 - Document Ingestion Workflow (RAG Foundation)
+
+### Data Model + Contracts
+- [ ] Add `document_sources` schema (type, uri, tenant, owner, classification, status).
+- [ ] Add `documents` schema (source_id, title, checksum, version, effective_date, is_active).
+- [ ] Add `document_chunks` schema (document_id, chunk_index, chunk_text, metadata).
+- [ ] Define ingestion status contract (`pending`, `processing`, `ready`, `failed`).
+- [ ] Add idempotency contract using content checksum/hash.
+
+### Source Registration + Validation
+- [ ] Support source registration for v1 (`git`, `s3`, `upload`).
+- [ ] Enforce allowlist for source URIs/paths (no arbitrary public URLs).
+- [ ] Validate tenant/owner/classification metadata at ingestion request time.
+
+### Extraction + Normalization
+- [ ] Implement extraction pipeline for v1 formats (`md`, `pdf` text-based, `html`, `txt`).
+- [ ] Normalize extracted content to UTF-8 plain text with stable metadata.
+- [ ] Reject low-quality/OCR-poor scanned documents in v1.
+- [ ] Persist extraction failures with reason codes for retry/debug.
+
+### Chunking + Embedding + Indexing
+- [ ] Implement chunking strategy with overlap and section boundary preservation.
+- [ ] Persist chunk-level traceability (`doc_id`, `version`, `section`, `chunk_id`).
+- [ ] Generate embeddings with pinned model version and config.
+- [ ] Upsert vectors with metadata filters (`tenant`, `classification`, `doc_type`, `version`).
+- [ ] Add ingestion-time duplicate detection (checksum + similarity guardrails).
+
+### Publish + Versioning
+- [ ] Implement async job workflow (`extract -> chunk -> embed -> index -> publish`).
+- [ ] Keep previous document version active until new version reaches `ready`.
+- [ ] Add reindex workflow for updated documents with zero-downtime swap.
+- [ ] Implement soft-delete for docs plus retention-based vector cleanup.
+
+### Retrieval Readiness + Observability
+- [ ] Enforce retrieval-time metadata filters for tenant/classification authorization.
+- [ ] Persist ingestion run audit trail (counts, durations, embedding model, failures).
+- [ ] Add ingestion metrics/logs (success rate, failure rate, processing latency).
+- [ ] Add endpoint/admin visibility for ingestion status and failure diagnostics.
+
 ## P1 - Product Features + Safety
 
 ### Prompting v1 (Opt-in)
